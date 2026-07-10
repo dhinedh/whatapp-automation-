@@ -6,7 +6,14 @@ const cors = require('cors');
 const cron = require('node-cron');
 
 const app = express();
-app.use(cors({ origin: 'https://testbot-gray-rho.vercel.app' }));
+app.use(cors({
+  origin: [
+    'https://testbot-gray-rho.vercel.app',
+    'https://whatapp-automation-xi.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ]
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
