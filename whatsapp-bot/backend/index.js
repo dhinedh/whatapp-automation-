@@ -4,6 +4,7 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cron = require('node-cron');
+const path = require('path');
 
 const app = express();
 app.use(cors({
@@ -15,11 +16,13 @@ app.use(cors({
   ]
 }));
 app.use(express.json());
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const BANNER_IMAGE_URL = process.env.BANNER_IMAGE_URL || 'https://whatapp-automation-kxml.onrender.com/public/mansara_banner.jpg';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-crm';
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
@@ -116,6 +119,30 @@ async function sendMessage(to, text) {
     }
 }
 
+async function sendImageMessage(to, imageUrl, caption = "") {
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    try {
+        const payload = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: to,
+            type: 'image',
+            image: { link: imageUrl }
+        };
+        if (caption) {
+            payload.image.caption = caption;
+        }
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            data: payload
+        });
+    } catch (error) {
+        console.error("Error sending image message:", error.response ? error.response.data : error.message);
+    }
+}
+
 async function sendInteractiveButtons(to, bodyText, buttonsArray) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     const buttons = buttonsArray.map((btn) => ({
@@ -187,7 +214,7 @@ const MESSAGES = {
         opt_in_thank_you: "Thank you for opting in! 🌿 We will keep you updated with our latest traditional health products and exclusive offers.",
         opt_out_thank_you: "No problem! You are now browsing in Guest Mode. You won't receive promotional alerts. You can type 'START' anytime to opt back in.",
         language_select: "🇬🇧 *Please select your preferred language:*\n\n1️⃣ English\n2️⃣ Tamil / தமிழ்",
-        main_menu: "🌿 *Mansara Foods Main Menu* 🌿\n\nHow can we serve you today?\n\n*1️⃣ Browse Catalog 📁*\n*2️⃣ View Cart & Checkout 🛒*\n*3️⃣ My Orders & Tracking 📦*\n*4️⃣ Loyalty Program 🎁*\n*5️⃣ Customer Support & FAQs 💬*\n*6️⃣ Talk to a Human 👤*\n\n_Reply with a number or tap a button below_",
+        main_menu: "👋 *Welcome to Mansara Foods!* 🌿\n\nHow can we serve you today?\n\n*1️⃣ View Products 📁*\n*2️⃣ Place an Order 🛒*\n*3️⃣ Track My Order 📦*\n*4️⃣ Dealer Registration 🤝*\n*5️⃣ Bulk Orders 📦*\n*6️⃣ Offers & Discounts 🎟️*\n*7️⃣ Recipes 🍳*\n*8️⃣ Store Locator 📍*\n*9️⃣ Customer Support 💬*\n*🔟 Contact Sales Team 👤*\n\n_Reply with a number (1-10) or tap the button below to choose from the menu list._",
         catalog_menu: "📁 *Mansara Product Categories* 📁\n\nTap the button below or reply with a number to view products:\n\n*1️⃣ Health Mixes & Porridge 🥣*\n*2️⃣ Rice Mixes & Podi 🌾*\n*3️⃣ Combos & Value Packs 🎁*\n\n_4️⃣ Back to Main Menu 🏠_",
         cart_empty: "🛒 *Your Cart is Empty!*\n\nBrowse our traditional food categories to add delicious, health-boosting items.",
         invalid_option: "😊 I didn't quite understand that. Please reply with a valid option or number, or tap a button below to navigate.",
@@ -208,7 +235,7 @@ const MESSAGES = {
         opt_in_thank_you: "ஒப்புக்கொண்டதற்கு நன்றி! 🌿 எங்கள் சமீபத்திய தயாரிப்புகள் மற்றும் பிரத்யேக சலுகைகளை உங்களுக்கு வாட்ஸ்அப்பில் அறிவிப்போம்.",
         opt_out_thank_you: "பரவாயில்லை! நீங்கள் இப்போது விருந்தினர் பயன்முறையில் உலாவுகிறீர்கள். உங்களுக்கு விளம்பர விழிப்பூட்டல்கள் கிடைக்காது. மீண்டும் இணைய எப்போது வேண்டுமானாலும் 'START' என டைப் செய்யவும்.",
         language_select: "🇬🇧 *தயவுசெய்து உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்:*\n\n1️⃣ English\n2️⃣ Tamil / தமிழ்",
-        main_menu: "🌿 *மன்சரா ஃபுட்ஸ் முதன்மை பட்டி* 🌿\n\nஇன்று நாங்கள் உங்களுக்கு எவ்வாறு உதவலாம்?\n\n*1️⃣ தயாரிப்பு பட்டியலை உலாவுங்கள் 📁*\n*2️⃣ கார்ட் மற்றும் செக்அவுட் பார்க்க 🛒*\n*3️⃣ எனது ஆர்டர்கள் மற்றும் டிராக்கிங் 📦*\n*4️⃣ லாயல்டி திட்டம் 🎁*\n*5️⃣ வாடிக்கையாளர் ஆதரவு மற்றும் கேள்விகள் 💬*\n*6️⃣ எஜென்ட்டிடம் பேச 👤*\n\n_பதில் அளிக்க எண் எழுதவும் அல்லது பட்டன்களை தட்டவும்_",
+        main_menu: "👋 *மன்சரா ஃபுட்ஸ்-க்கு உங்களை வரவேற்கிறோம்!* 🌿\n\nஇன்று நாங்கள் உங்களுக்கு எவ்வாறு உதவலாம்?\n\n*1️⃣ தயாரிப்புகளைப் பார்க்க 📁*\n*2️⃣ ஆர்டர் செய்ய 🛒*\n*3️⃣ ஆர்டரைக் கண்காணிக்க 📦*\n*4️⃣ டீலர் பதிவு 🤝*\n*5️⃣ மொத்த ஆர்டர்கள் 📦*\n*6️⃣ சலுகைகள் & தள்ளுபடிகள் 🎟️*\n*7️⃣ சமையல் குறிப்புகள் 🍳*\n*8️⃣ கடைகள் இருப்பிடம் 📍*\n*9️⃣ வாடிக்கையாளர் ஆதரவு 💬*\n*🔟 விற்பனை குழுவை தொடர்பு கொள்ள 👤*\n\n_எண்ணைக் கொண்டு (1-10) பதிலளிக்கவும் அல்லது மெனுவில் தேர்ந்தெடுக்கவும்_",
         catalog_menu: "📁 *மன்சரா தயாரிப்பு வகைகள்* 📁\n\nதயாரிப்புகளைப் பார்க்க கீழே உள்ள பட்டனை தட்டவும் அல்லது எண்ணைக் கொண்டு பதிலளிக்கவும்:\n\n*1️⃣ சத்து மாவுகள் & ஹெல்த் மிக்ஸ் 🥣*\n*2️⃣ சாதப் பொடிகள் & பொடி வகைகள் 🌾*\n*3️⃣ சிறப்பு காம்போ பேக்குகள் 🎁*\n\n_4️⃣ முதன்மை பட்டிக்குத் திரும்புக 🏠_",
         cart_empty: "🛒 *உங்கள் கார்ட் காலியாக உள்ளது!*\n\nஆரோக்கியமான பொருட்களைச் சேர்க்க தயாரிப்பு வகைகளை உலாவுங்கள்.",
         invalid_option: "😊 என்னால் அதைப் புரிந்து கொள்ள முடியவில்லை. தயவுசெய்து சரியான விருப்பத்தைத் தேர்ந்தெடுக்கவும் அல்லது கீழே உள்ள பட்டனை தட்டவும்.",
@@ -338,26 +365,111 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    // --- PROCESS MAIN MENU OPTIONS ---
-    if (contact.step === 'main_menu') {
-        if (msg === '1' || msg === 'btn_catalog' || msg.includes('catalog') || msg.includes('browse')) {
+    // --- PROCESS DEALER REGISTRATION & BULK ORDER INPUTS ---
+    if (contact.step === 'dealer_registration') {
+        contact.step = 'main_menu';
+        contact.lead_status = 'Dealer Lead';
+        contact.tickets.push({ ticketId: `DLR-${Date.now().toString().slice(-4)}`, subject: `Dealer Reg: ${messageText.slice(0, 30)}` });
+        await contact.save();
+        const ackMsg = lang === 'en'
+            ? `✅ *Dealer Registration Received!*\n\nThank you! Our wholesale manager will review your submission and contact you shortly.`
+            : `✅ *டீலர் பதிவு பெறப்பட்டது!*\n\nநன்றி! எங்கள் குழு விரைவில் உங்களைத் தொடர்பு கொள்ளும்.`;
+        await sendInteractiveButtons(phone, ackMsg, [{ id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }]);
+        return;
+    }
+
+    if (contact.step === 'bulk_orders') {
+        contact.step = 'main_menu';
+        contact.lead_status = 'Bulk Order Enquiry';
+        contact.tickets.push({ ticketId: `BLK-${Date.now().toString().slice(-4)}`, subject: `Bulk Enquiry: ${messageText.slice(0, 30)}` });
+        await contact.save();
+        const ackMsg = lang === 'en'
+            ? `✅ *Bulk Order Inquiry Submitted!*\n\nThank you! Our B2B sales team will calculate your volume discount and reply with a formal quote shortly.`
+            : `✅ *மொத்த ஆர்டர் கோரிக்கை சமர்ப்பிக்கப்பட்டது!*\n\nநன்றி! எங்கள் விற்பனைக் குழு விரைவில் விலை விவரங்களை அனுப்பும்.`;
+        await sendInteractiveButtons(phone, ackMsg, [{ id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }]);
+        return;
+    }
+
+    // --- PROCESS MAIN MENU OPTIONS (1 to 10) ---
+    if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
+        // Option 1: View Products
+        if (msg === '1' || msg === 'opt_1_products' || msg.includes('product') || msg.includes('browse') || msg === 'btn_catalog') {
             await sendCatalogMenu(phone, contact);
             return;
         }
-        if (msg === '2' || msg === 'btn_cart' || msg.includes('cart') || msg.includes('checkout')) {
+        // Option 2: Place an Order
+        if (msg === '2' || msg === 'opt_2_order' || msg.includes('place order') || msg.includes('checkout') || msg === 'btn_cart') {
             await sendCartView(phone, contact);
             return;
         }
-        if (msg === '3' || msg === 'btn_orders' || msg.includes('order') || msg.includes('track')) {
+        // Option 3: Track My Order
+        if (msg === '3' || msg === 'opt_3_track' || msg.includes('track') || msg.includes('my order') || msg === 'btn_orders') {
             await sendOrdersMenu(phone, contact);
             return;
         }
-        if (msg === '4' || msg === 'btn_loyalty' || msg.includes('loyalty') || msg.includes('points')) {
+        // Option 4: Dealer Registration
+        if (msg === '4' || msg === 'opt_4_dealer' || msg.includes('dealer') || msg.includes('distributor') || msg.includes('partner')) {
+            contact.step = 'dealer_registration';
+            await contact.save();
+            const dealerMsg = lang === 'en'
+                ? `🤝 *Mansara Foods Dealer Registration* 🤝\n\nPartner with us to distribute authentic organic health mixes & traditional food products in your region!\n\nPlease reply with your details:\n1. Your Name / Business Name\n2. City / District & State\n3. Contact Phone Number & Email\n\nOur partnership team will get in touch with you within 24 hours.`
+                : `🤝 *மன்சரா ஃபுட்ஸ் டீலர் பதிவு* 🤝\n\nஉங்கள் பகுதியில் எங்கள் பாரம்பரிய உணவுப் பொருட்களை விநியோகிக்க எங்களோடு இணையுங்கள்!\n\nதயவுசெய்து உங்கள் விவரங்களை எழுதவும்:\n1. உங்கள் பெயர் / வணிகப் பெயர்\n2. மாவட்டம் & மாநிலம்\n3. தொலைபேசி எண்\n\nஎங்கள் குழு 24 மணி நேரத்திற்குள் உங்களைத் தொடர்பு கொள்ளும்.`;
+            await sendMessage(phone, dealerMsg);
+            return;
+        }
+        // Option 5: Bulk Orders
+        if (msg === '5' || msg === 'opt_5_bulk' || msg.includes('bulk') || msg.includes('wholesale')) {
+            contact.step = 'bulk_orders';
+            await contact.save();
+            const bulkMsg = lang === 'en'
+                ? `📦 *Mansara Bulk & Wholesale Orders* 📦\n\nWe supply bulk quantities for corporate gifting, events, restaurants & institutions.\n\nPlease type the products and quantity you require (e.g. *50 Packs Ragi Choco Malt, 100 Packs Paruppu Podi*).\n\nOur B2B sales team will send you custom wholesale pricing!`
+                : `📦 *மன்சரா மொத்த மற்றும் மொத்த விற்பனை ஆர்டர்கள்* 📦\n\nநிறுவனங்கள், விழாக்கள் மற்றும் உணவகங்களுக்கு மொத்தமாக விநியோகம் செய்கிறோம்.\n\nஉங்களுக்குத் தேவையான பொருட்கள் மற்றும் அளவைக் குறிப்பிடவும்.\n\nஎங்கள் விற்பனைக் குழு உங்களுக்கு பிரத்யேக மொத்த விலையை அனுப்பும்!`;
+            await sendMessage(phone, bulkMsg);
+            return;
+        }
+        // Option 6: Offers & Discounts
+        if (msg === '6' || msg === 'opt_6_offers' || msg.includes('offer') || msg.includes('discount') || msg.includes('coupon')) {
             await sendLoyaltyInfo(phone, contact);
             return;
         }
-        if (msg === '5' || msg === 'btn_support' || msg.includes('support') || msg.includes('faq')) {
+        // Option 7: Recipes
+        if (msg === '7' || msg === 'opt_7_recipes' || msg.includes('recipe') || msg.includes('dish') || msg.includes('cook')) {
+            const recipeMsg = lang === 'en'
+                ? `🍳 *Mansara Healthy Traditional Recipes* 🍳\n\nTry these delicious, nutrient-rich dishes at home:\n\n🥣 *1. Ragi Choco Malt Drink:* Mix 2 tsp Mansara Ragi Choco Malt in warm milk/water. Stir well & enjoy a healthy energy boost!\n\n🌾 *2. Kavuni Multigrain Porridge:* Boil 3 tbsp Nutriminix Health Mix with 2 cups of water. Add a pinch of salt & fresh buttermilk.\n\n🍚 *3. Authentic Podi Rice:* Mix 2 tbsp Paruppu or Pirandai Podi with hot steamed rice and a spoonful of pure Ghee.\n\nTap below to buy the ingredients!`
+                : `🍳 *மன்சரா ஆரோக்கியமான பாரம்பரிய செய்முறைகள்* 🍳\n\nசுவையான ஆரோக்கிய உணவுகள்:\n\n🥣 *1. ராகி சோக்கோ மால்ட்:* 2 ஸ்பூன் மன்சரா ராகி சோக்கோ மால்ட்டை வெதுவெதுப்பான பாலில் கலந்து குடிக்கவும்.\n\n🌾 *2. சத்து மாவு கஞ்சி:* 3 ஸ்பூன் நியூட்ரிமினிக்ஸ் சத்து மாவை 2 கப் தண்ணீரில் கொதிக்க வைத்து, சிறிதளவு உப்பு மற்றும் மோர் சேர்க்கவும்.\n\n🍚 *3. சுவையான பொடி சாதம்:* சூடான சாதத்தில் 2 ஸ்பூன் பருப்பு அல்லது பிரண்டை பொடி மற்றும் நெய் கலந்து சாப்பிடவும்.`;
+            await sendInteractiveButtons(phone, recipeMsg, [
+                { id: "btn_catalog", title: lang === 'en' ? "Shop Ingredients 🛍️" : "பொருட்கள் வாங்க 🛍️" },
+                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+            ]);
+            return;
+        }
+        // Option 8: Store Locator
+        if (msg === '8' || msg === 'opt_8_store' || msg.includes('store') || msg.includes('location') || msg.includes('address')) {
+            const storeMsg = lang === 'en'
+                ? `📍 *Mansara Foods Outlets & Online Store* 📍\n\n🏢 *Head Office & Experience Store:*\nMansara Foods Pvt Ltd, Chennai, Tamil Nadu - 600001\n📞 Support: +91 88388 87064\n\n🌐 *Official Online Shop:* https://mansarafoods.com\n🚚 *Delivery:* Fast delivery available across PAN India & select international locations.\n\nTap below to order online!`
+                : `📍 *மன்சரா ஃபுட்ஸ் கடைகள் & ஆன்லைன் ஸ்டோர்* 📍\n\n🏢 *தலைமை அலுவலகம்:*\nமன்சரா ஃபுட்ஸ் பிரைவேட் லிமிடெட், சென்னை, தமிழ்நாடு.\n📞 உதவி: +91 88388 87064\n\n🌐 *ஆன்லைன் கடை:* https://mansarafoods.com\n🚚 *டெலிவரி:* இந்தியா முழுவதும் விரைவான விநியோகம்.`;
+            await sendInteractiveButtons(phone, storeMsg, [
+                { id: "btn_catalog", title: lang === 'en' ? "Order Online 🛍️" : "ஆன்லைனில் ஆர்டர் செய்ய 🛍️" },
+                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+            ]);
+            return;
+        }
+        // Option 9: Customer Support
+        if (msg === '9' || msg === 'opt_9_support' || msg.includes('support') || msg.includes('help') || msg === 'btn_support') {
             await sendSupportMenu(phone, contact);
+            return;
+        }
+        // Option 10: Contact Sales Team
+        if (msg === '10' || msg === 'opt_10_sales' || msg.includes('sales') || msg.includes('contact') || msg.includes('human') || msg === 'btn_human') {
+            contact.is_paused = true;
+            contact.step = 'human_takeover';
+            await contact.save();
+            
+            const handoffMsg = lang === 'en' 
+                ? `👋 *Connecting you to the Mansara Sales Team!*\n\nOur team representative will respond to your chat shortly.\n\n📞 *Direct Phone / WhatsApp:* +91 88388 87064 / +91 79045 07105\n_Hours: 9 AM - 7 PM (Mon-Sat)_`
+                : `👋 *மன்சரா விற்பனைக் குழுவோடு உங்களை இணைக்கிறோம்!*\n\nஎங்கள் விற்பனை பிரதிநிதி விரைவில் பதிலளிப்பார்.\n\n📞 *தொடர்பு எண்:* +91 88388 87064 / +91 79045 07105`;
+            
+            await sendMessage(phone, handoffMsg);
             return;
         }
     }
@@ -784,16 +896,43 @@ async function handleBotReply(phone, messageText, contact) {
     ]);
 }
 
-// --- HELPER WRAPPER FUNCTIONS ---
-
 async function sendMainMenu(phone, contact) {
     const lang = contact.language || 'en';
     const t = MESSAGES[lang] || MESSAGES.en;
-    await sendInteractiveButtons(phone, t.main_menu, [
-        { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "கடைப் பட்டியல் 📁" },
-        { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் காண்க 🛒" },
-        { id: "btn_support", title: lang === 'en' ? "Support 💬" : "ஆதரவு 💬" }
-    ]);
+    contact.step = 'main_menu';
+    await contact.save();
+
+    // Send Mansara Foods Premium Product Banner Image
+    await sendImageMessage(
+        phone, 
+        BANNER_IMAGE_URL, 
+        lang === 'en' ? "🌿 *MANSARA FOODS - Premium, Healthy, & Delicious*" : "🌿 *மன்சரா ஃபுட்ஸ் - சுவையான & ஆரோக்கியமான உணவு பொருட்கள்*"
+    );
+
+    const sections = [
+        {
+            title: lang === 'en' ? "Mansara Foods Menu" : "மன்சரா ஃபுட்ஸ் பட்டி",
+            rows: [
+                { id: "opt_1_products", title: lang === 'en' ? "1️⃣ View Products" : "1️⃣ தயாரிப்புகளைப் பார்க்க", description: "Browse traditional health mixes & podis" },
+                { id: "opt_2_order", title: lang === 'en' ? "2️⃣ Place an Order" : "2️⃣ ஆர்டர் செய்ய", description: "View cart & checkout items" },
+                { id: "opt_3_track", title: lang === 'en' ? "3️⃣ Track My Order" : "3️⃣ ஆர்டரைக் கண்காணிக்க", description: "Check status of your purchases" },
+                { id: "opt_4_dealer", title: lang === 'en' ? "4️⃣ Dealer Registration" : "4️⃣ டீலர் பதிவு", description: "Become a partner / distributor" },
+                { id: "opt_5_bulk", title: lang === 'en' ? "5️⃣ Bulk Orders" : "5️⃣ மொத்த ஆர்டர்கள்", description: "Inquire about wholesale pricing" },
+                { id: "opt_6_offers", title: lang === 'en' ? "6️⃣ Offers & Discounts" : "6️⃣ சலுகைகள் & தள்ளுபடிகள்", description: "Special coupon codes & discounts" },
+                { id: "opt_7_recipes", title: lang === 'en' ? "7️⃣ Recipes" : "7️⃣ சமையல் குறிப்புகள்", description: "Healthy dishes & preparation ideas" },
+                { id: "opt_8_store", title: lang === 'en' ? "8️⃣ Store Locator" : "8️⃣ கடைகள் இருப்பிடம்", description: "Find nearby outlets & shipping info" },
+                { id: "opt_9_support", title: lang === 'en' ? "9️⃣ Customer Support" : "9️⃣ வாடிக்கையாளர் ஆதரவு", description: "FAQs, returns & help center" },
+                { id: "opt_10_sales", title: lang === 'en' ? "🔟 Contact Sales Team" : "🔟 விற்பனை குழு", description: "Speak with a representative" }
+            ]
+        }
+    ];
+
+    await sendInteractiveList(
+        phone,
+        t.main_menu,
+        lang === 'en' ? "Select Option 📋" : "தேர்வு செய்க 📋",
+        sections
+    );
 }
 
 async function sendCatalogMenu(phone, contact) {
