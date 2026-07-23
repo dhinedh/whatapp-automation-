@@ -4,7 +4,6 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cron = require('node-cron');
-const path = require('path');
 
 const app = express();
 app.use(cors({
@@ -16,13 +15,11 @@ app.use(cors({
   ]
 }));
 app.use(express.json());
-app.use('/public', express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-const BANNER_IMAGE_URL = process.env.BANNER_IMAGE_URL || 'https://whatapp-automation-kxml.onrender.com/public/mansara_banner.jpg';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-crm';
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
@@ -116,30 +113,6 @@ async function sendMessage(to, text) {
         });
     } catch (error) {
         console.error("Error sending message:", error.response ? error.response.data : error.message);
-    }
-}
-
-async function sendImageMessage(to, imageUrl, caption = "") {
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    try {
-        const payload = {
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: to,
-            type: 'image',
-            image: { link: imageUrl }
-        };
-        if (caption) {
-            payload.image.caption = caption;
-        }
-        await axios({
-            method: 'POST',
-            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
-            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-            data: payload
-        });
-    } catch (error) {
-        console.error("Error sending image message:", error.response ? error.response.data : error.message);
     }
 }
 
@@ -901,13 +874,6 @@ async function sendMainMenu(phone, contact) {
     const t = MESSAGES[lang] || MESSAGES.en;
     contact.step = 'main_menu';
     await contact.save();
-
-    // Send Mansara Foods Premium Product Banner Image
-    await sendImageMessage(
-        phone, 
-        BANNER_IMAGE_URL, 
-        lang === 'en' ? "🌿 *MANSARA FOODS - Premium, Healthy, & Delicious*" : "🌿 *மன்சரா ஃபுட்ஸ் - சுவையான & ஆரோக்கியமான உணவு பொருட்கள்*"
-    );
 
     const sections = [
         {
