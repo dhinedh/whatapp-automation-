@@ -15,6 +15,8 @@ app.use(cors({
   ]
 }));
 app.use(express.json());
+app.use(express.static('public'));
+app.use('/media', express.static('public'));
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
@@ -23,6 +25,8 @@ const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-crm';
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://whatapp-automation-kxml.onrender.com';
+const BANNER_IMAGE_URL = `${BACKEND_URL}/mansara_banner.jpg`;
 
 // --- MongoDB Setup ---
 mongoose.connect(MONGO_URI)
@@ -113,6 +117,28 @@ async function sendMessage(to, text) {
         });
     } catch (error) {
         console.error("Error sending message:", error.response ? error.response.data : error.message);
+    }
+}
+
+async function sendImageMessage(to, imageUrl, captionText = "") {
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    try {
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            data: {
+                messaging_product: 'whatsapp',
+                to: to,
+                type: 'image',
+                image: {
+                    link: imageUrl,
+                    ...(captionText ? { caption: captionText } : {})
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error sending image message:", error.response ? error.response.data : error.message);
     }
 }
 
@@ -874,6 +900,9 @@ async function sendMainMenu(phone, contact) {
     const t = MESSAGES[lang] || MESSAGES.en;
     contact.step = 'main_menu';
     await contact.save();
+
+    // Send Mansara Foods Product Banner Image
+    await sendImageMessage(phone, BANNER_IMAGE_URL, lang === 'en' ? "🌿 *MANSARA FOODS* — Premium, Healthy, & Delicious!" : "🌿 *மன்சரா ஃபுட்ஸ்* — சுவையான பாராம்பரிய சத்துணவுகள்!");
 
     const sections = [
         {
