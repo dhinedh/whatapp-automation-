@@ -902,9 +902,6 @@ async function sendMainMenu(phone, contact) {
     contact.step = 'main_menu';
     await contact.save();
 
-    // Send Mansara Foods Product Banner Image asynchronously
-    sendImageMessage(phone, BANNER_IMAGE_URL, lang === 'en' ? "🌿 *MANSARA FOODS* — Premium, Healthy, & Delicious!" : "🌿 *மன்சரா ஃபுட்ஸ்* — சுவையான பாராம்பரிய சத்துணவுகள்!").catch(() => {});
-
     const sections = [
         {
             title: lang === 'en' ? "Mansara Foods Menu" : "மன்சரா ஃபுட்ஸ் பட்டி",
