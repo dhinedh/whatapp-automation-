@@ -90,13 +90,15 @@ const contactSchema = new mongoose.Schema({
 
 const Contact = mongoose.model('Contact', contactSchema);
 
-// --- Mansara Foods Mock Products Database ---
+// --- Mansara Foods Products Database (mansarafoods.com) ---
 const PRODUCTS = [
-    { id: "prod_turmeric", name: "Organic Lakadong Turmeric (250g)", category: "Spices", price: 180, stock: 50, description: "High curcumin content, directly sourced from sustainable organic farmers." },
-    { id: "prod_almonds", name: "Premium California Almonds (500g)", category: "Dry Fruits", price: 450, stock: 120, description: "Crunchy and rich in nutrients, perfect daily healthy snack." },
-    { id: "prod_coconut_oil", name: "Cold-Pressed Coconut Oil (1L)", category: "Oils", price: 320, stock: 35, description: "100% pure, unrefined, extracted from fresh premium coconuts." },
-    { id: "prod_honey", name: "Raw Forest Honey (500g)", category: "Sweets", price: 290, stock: 80, description: "Pure honey collected from wild forests, natural sweetener." },
-    { id: "prod_cookies", name: "Millet & Ragi Cookies (200g)", category: "Snacks", price: 120, stock: 15, description: "Gluten-free, sugar-free healthy high-fiber cookies." }
+    { id: "prod_ragi_choco", name: "Mansara Ragi Choco Malt (250g)", category: "Health Mixes", price: 250, stock: 80, description: "Nutritious health drink mix combining pure Ragi (finger millet) with rich cocoa." },
+    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Health Mix (250g)", category: "Health Mixes", price: 200, stock: 100, description: "Traditional health mix with Kavuni black rice, samba wheat, barley & millets." },
+    { id: "prod_paruppu_podi", name: "Homestyle Paruppu Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 150, description: "Authentic South Indian roasted lentil rice mix powder." },
+    { id: "prod_pirandai_podi", name: "Pirandai Power Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 120, description: "Herbal Veldt Grape rice mix powder, traditional recipe for digestion & joint health." },
+    { id: "prod_karuveppilai_podi", name: "Karuveppilai Special Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 90, description: "Aromatic Curry Leaves rice powder rich in natural iron & traditional flavor." },
+    { id: "prod_kothamalli_podi", name: "Kothamalli Aroma Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 68, stock: 75, description: "Fresh Coriander rice mix powder packed with authentic herbal goodness." },
+    { id: "prod_rice_combo", name: "5-Flavor Traditional Rice Mix Podi Combo (5x100g)", category: "Combos & Packs", price: 400, stock: 40, description: "Special value pack featuring 5 authentic traditional rice mix podi varieties." }
 ];
 
 // --- Send Message Functions ---
@@ -181,33 +183,33 @@ function calculateLeadScore(contact) {
 // --- Multilingual Bot Messages Dictionary ---
 const MESSAGES = {
     en: {
-        welcome: "🌿 *Welcome to Mansara Foods!* 🌿\n\nPure, Organic, and Natural Food Products delivered directly to your doorstep.\n\n🏆 Certified Organic Standards\n✅ Direct from Sustainable Farmers\n✅ Zero Preservatives or Chemicals\n✅ PAN India Fast Delivery\n\nDo you consent to receive order updates, catalog details, and special offers from us on WhatsApp? (WhatsApp Policy Compliance)\n\n1️⃣ Yes, I agree & opt-in\n2️⃣ No, continue as Guest",
-        opt_in_thank_you: "Thank you for opting in! 🌿 We will keep you updated with our latest organic products and exclusive offers.",
+        welcome: "🌿 *Welcome to Mansara Foods!* 🌿\n\nPure, Traditional, and Healthy Food Products (Health Mixes, Rice Mix Podis & Herbal Foods) delivered directly to your doorstep.\n\n🏆 Traditional & Natural Recipes\n✅ Homestyle Quality & Authentic Taste\n✅ Zero Preservatives or Chemicals\n✅ PAN India Fast Delivery\n\nDo you consent to receive order updates, catalog details, and special offers from us on WhatsApp? (WhatsApp Policy Compliance)\n\n1️⃣ Yes, I agree & opt-in\n2️⃣ No, continue as Guest",
+        opt_in_thank_you: "Thank you for opting in! 🌿 We will keep you updated with our latest traditional health products and exclusive offers.",
         opt_out_thank_you: "No problem! You are now browsing in Guest Mode. You won't receive promotional alerts. You can type 'START' anytime to opt back in.",
         language_select: "🇬🇧 *Please select your preferred language:*\n\n1️⃣ English\n2️⃣ Tamil / தமிழ்",
         main_menu: "🌿 *Mansara Foods Main Menu* 🌿\n\nHow can we serve you today?\n\n*1️⃣ Browse Catalog 📁*\n*2️⃣ View Cart & Checkout 🛒*\n*3️⃣ My Orders & Tracking 📦*\n*4️⃣ Loyalty Program 🎁*\n*5️⃣ Customer Support & FAQs 💬*\n*6️⃣ Talk to a Human 👤*\n\n_Reply with a number or tap a button below_",
-        catalog_menu: "📁 *Mansara Product Categories* 📁\n\nTap the button below or reply with a number to view products:\n\n*1️⃣ Spices 🌶️*\n*2️⃣ Dry Fruits 🥜*\n*3️⃣ Cold-Pressed Oils 🛢️*\n*4️⃣ Honey & Sweets 🍯*\n*5️⃣ Healthy Snacks 🍪*\n\n_6️⃣ Back to Main Menu 🏠_",
-        cart_empty: "🛒 *Your Cart is Empty!*\n\nBrowse our natural food categories to add some delicious, healthy goodies.",
+        catalog_menu: "📁 *Mansara Product Categories* 📁\n\nTap the button below or reply with a number to view products:\n\n*1️⃣ Health Mixes & Porridge 🥣*\n*2️⃣ Rice Mixes & Podi 🌾*\n*3️⃣ Combos & Value Packs 🎁*\n\n_4️⃣ Back to Main Menu 🏠_",
+        cart_empty: "🛒 *Your Cart is Empty!*\n\nBrowse our traditional food categories to add delicious, health-boosting items.",
         invalid_option: "😊 I didn't quite understand that. Please reply with a valid option or number, or tap a button below to navigate.",
         checkout_address: "💳 *Checkout - Shipping Details*\n\nPlease type your complete delivery address (Street, City, Pincode):",
         checkout_pay_mode: "📍 *Delivery Address Saved!*\n\nAddress: {address}\n\nHow would you like to pay?\n\n*1️⃣ Pay Online (UPI, Card, NetBanking)*\n*2️⃣ Cash on Delivery (COD)*",
-        payment_pending: "💳 *Secure Online Payment*\n\nOrder ID: *{orderId}*\nTotal Amount: *₹{total}*\n\n👉 Complete payment securely using this mock gateway link: https://mansarafoods.com/pay/{orderId}\n\nOnce completed, click the button below or reply 'CONFIRM' to verify.",
-        cod_success: "🎉 *Order Confirmed!*\n\nOrder ID: *{orderId}*\nTotal: *₹{total}*\nPayment: *Cash on Delivery (COD)*\n\n✅ We are preparing your order for dispatch! Tracking link will be sent shortly.\n🎁 You earned *{points} loyalty points*!",
+        payment_pending: "💳 *Secure Online Payment*\n\nOrder ID: *{orderId}*\nTotal Amount: *₹{total}*\n\n👉 Complete payment securely using our official portal: https://mansarafoods.com/pay/{orderId}\n\nOnce completed, click the button below or reply 'CONFIRM' to verify.",
+        cod_success: "🎉 *Order Confirmed!*\n\nOrder ID: *{orderId}*\nTotal: *₹{total}*\nPayment: *Cash on Delivery (COD)*\n\n✅ We are preparing your fresh order for dispatch! Tracking link will be sent shortly.\n🎁 You earned *{points} loyalty points*!",
         online_success: "🎉 *Payment Received & Order Confirmed!*\n\nOrder ID: *{orderId}*\nTotal Paid: *₹{total}*\n\n✅ Your payment has been verified. We will notify you when it ships!\n🎁 You earned *{points} loyalty points*!",
-        support_menu: "💬 *Mansara Help Center* 💬\n\nSelect a topic to view details:\n\n*1️⃣ Shipping & Delivery Policy*\n*2️⃣ Return, Refund & Exchange Policy*\n*3️⃣ Organic Certifications & Sourcing*\n*4️⃣ Report an Issue / Raise a Ticket*\n*5️⃣ Talk to a Live Agent 👤*\n*6️⃣ Back to Main Menu 🏠*",
+        support_menu: "💬 *Mansara Help Center* 💬\n\nSelect a topic to view details:\n\n*1️⃣ Shipping & Delivery Policy*\n*2️⃣ Return, Refund & Exchange Policy*\n*3️⃣ Natural Ingredients & Health Mix Benefits*\n*4️⃣ Report an Issue / Raise a Ticket*\n*5️⃣ Talk to a Live Agent 👤*\n*6️⃣ Back to Main Menu 🏠*",
         ticket_success: "✅ *Ticket Created Successfully!*\n\nTicket ID: *{ticketId}*\nSubject: {subject}\n\nOur customer support representative will review it and reply within 12 hours. Thank you!",
         no_orders: "📦 You haven't placed any orders yet. Start shopping to create one!",
-        loyalty_info: "🎁 *Mansara Loyalty Rewards* 🎁\n\nEarn points on every purchase and redeem them for discounts!\n\n*Your Points Balance:* {points} points\n*Value:* ₹{points}\n\n💡 *How it works:*\n- Earn 5% of order value as points on every order.\n- 1 point = ₹1.\n- Points are automatically applied as a discount on your next order!\n\nTap below to shop organic!",
+        loyalty_info: "🎁 *Mansara Loyalty Rewards* 🎁\n\nEarn points on every purchase and redeem them for discounts!\n\n*Your Points Balance:* {points} points\n*Value:* ₹{points}\n\n💡 *How it works:*\n- Earn 5% of order value as points on every order.\n- 1 point = ₹1.\n- Points are automatically applied as a discount on your next order!\n\nTap below to shop healthy!",
         opt_out_success: "Unsubscribed successfully. You will not receive any more marketing broadcasts. Reply 'START' to subscribe again.",
         coupon_entry: "🎟️ *Enter Coupon Code:*\n\nType the coupon code (e.g. *SAVE10* for 10% off) or reply with 'CANCEL' to go back:"
     },
     ta: {
-        welcome: "🌿 *மன்சரா ஃபுட்ஸ்-க்கு உங்களை வரவேற்கிறோம்!* 🌿\n\nதூய்மையான, இயற்கை மற்றும் ஆர்கானிக் உணவு பொருட்கள் உங்கள் வீட்டிற்கே நேரடியாக விநியோகிக்கப்படும்.\n\n🏆 சான்றளிக்கப்பட்ட ஆர்கானிக் தரநிலைகள்\n✅ விவசாயிகளிடமிருந்து நேரடியாக\n✅ பாதுகாப்புகள் அல்லது இரசாயனங்கள் இல்லை\n✅ இந்தியா முழுவதும் விரைவான விநியோகம்\n\nவாட்ஸ்அப்பில் எங்களிடமிருந்து தயாரிப்பு பட்டியல்கள் மற்றும் சலுகைகளைப் பெற ஒப்புக்கொள்கிறீர்களா? (வாட்ஸ்அப் கொள்கை இணக்கம்)\n\n1️⃣ ஆம், நான் ஒப்புக்கொள்கிறேன் & இணைகிறேன்\n2️⃣ இல்லை, விருந்தினராக தொடரவும்",
+        welcome: "🌿 *மன்சரா ஃபுட்ஸ்-க்கு உங்களை வரவேற்கிறோம்!* 🌿\n\nதூய்மையான, பாராம்பரிய மற்றும் ஆரோக்கிய உணவு பொருட்கள் (சத்து மாவுகள், சாதப் பொடிகள் & மூலிகை உணவுகள்) உங்கள் வீட்டிற்கே நேரடியாக விநியோகிக்கப்படும்.\n\n🏆 பாரம்பரிய மற்றும் இயற்கை செய்முறைகள்\n✅ உயர் தரம் & வீட்டுமுறை சுவை\n✅ ரசாயனங்கள் அல்லது பாதுகாப்புகள் இல்லை\n✅ இந்தியா முழுவதும் விரைவான விநியோகம்\n\nவாட்ஸ்அப்பில் எங்களிடமிருந்து தயாரிப்பு பட்டியல்கள் மற்றும் சலுகைகளைப் பெற ஒப்புக்கொள்கிறீர்களா?\n\n1️⃣ ஆம், நான் ஒப்புக்கொள்கிறேன் & இணைகிறேன்\n2️⃣ இல்லை, விருந்தினராக தொடரவும்",
         opt_in_thank_you: "ஒப்புக்கொண்டதற்கு நன்றி! 🌿 எங்கள் சமீபத்திய தயாரிப்புகள் மற்றும் பிரத்யேக சலுகைகளை உங்களுக்கு வாட்ஸ்அப்பில் அறிவிப்போம்.",
         opt_out_thank_you: "பரவாயில்லை! நீங்கள் இப்போது விருந்தினர் பயன்முறையில் உலாவுகிறீர்கள். உங்களுக்கு விளம்பர விழிப்பூட்டல்கள் கிடைக்காது. மீண்டும் இணைய எப்போது வேண்டுமானாலும் 'START' என டைப் செய்யவும்.",
         language_select: "🇬🇧 *தயவுசெய்து உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்:*\n\n1️⃣ English\n2️⃣ Tamil / தமிழ்",
         main_menu: "🌿 *மன்சரா ஃபுட்ஸ் முதன்மை பட்டி* 🌿\n\nஇன்று நாங்கள் உங்களுக்கு எவ்வாறு உதவலாம்?\n\n*1️⃣ தயாரிப்பு பட்டியலை உலாவுங்கள் 📁*\n*2️⃣ கார்ட் மற்றும் செக்அவுட் பார்க்க 🛒*\n*3️⃣ எனது ஆர்டர்கள் மற்றும் டிராக்கிங் 📦*\n*4️⃣ லாயல்டி திட்டம் 🎁*\n*5️⃣ வாடிக்கையாளர் ஆதரவு மற்றும் கேள்விகள் 💬*\n*6️⃣ எஜென்ட்டிடம் பேச 👤*\n\n_பதில் அளிக்க எண் எழுதவும் அல்லது பட்டன்களை தட்டவும்_",
-        catalog_menu: "📁 *மன்சரா தயாரிப்பு வகைகள்* 📁\n\nதயாரிப்புகளைப் பார்க்க கீழே உள்ள பட்டனை தட்டவும் அல்லது எண்ணைக் கொண்டு பதிலளிக்கவும்:\n\n*1️⃣ மசாலாக்கள் 🌶️*\n*2️⃣ உலர் பழங்கள் 🥜*\n*3️⃣ செக்கு எண்ணெய் 🛢️*\n*4️⃣ தேன் மற்றும் இனிப்புகள் 🍯*\n*5️⃣ ஆரோக்கியமான தின்பண்டங்கள் 🍪*\n\n_6️⃣ முதன்மை பட்டிக்குத் திரும்புக 🏠_",
+        catalog_menu: "📁 *மன்சரா தயாரிப்பு வகைகள்* 📁\n\nதயாரிப்புகளைப் பார்க்க கீழே உள்ள பட்டனை தட்டவும் அல்லது எண்ணைக் கொண்டு பதிலளிக்கவும்:\n\n*1️⃣ சத்து மாவுகள் & ஹெல்த் மிக்ஸ் 🥣*\n*2️⃣ சாதப் பொடிகள் & பொடி வகைகள் 🌾*\n*3️⃣ சிறப்பு காம்போ பேக்குகள் 🎁*\n\n_4️⃣ முதன்மை பட்டிக்குத் திரும்புக 🏠_",
         cart_empty: "🛒 *உங்கள் கார்ட் காலியாக உள்ளது!*\n\nஆரோக்கியமான பொருட்களைச் சேர்க்க தயாரிப்பு வகைகளை உலாவுங்கள்.",
         invalid_option: "😊 என்னால் அதைப் புரிந்து கொள்ள முடியவில்லை. தயவுசெய்து சரியான விருப்பத்தைத் தேர்ந்தெடுக்கவும் அல்லது கீழே உள்ள பட்டனை தட்டவும்.",
         checkout_address: "💳 *செக்அவுட் - விநியோக விவரங்கள்*\n\nதயவுசெய்து உங்கள் முழுமையான விநியோக முகவரியைத் தட்டச்சு செய்யவும் (தெரு, நகரம், பின்கோடு):",
@@ -215,10 +217,10 @@ const MESSAGES = {
         payment_pending: "💳 *பாதுகாப்பான ஆன்லைன் கட்டணம்*\n\nஆர்டர் ஐடி: *{orderId}*\nமொத்த தொகை: *₹{total}*\n\n👉 பாதுகாப்பாக பணம் செலுத்த இந்த இணைப்பைப் பயன்படுத்தவும்: https://mansarafoods.com/pay/{orderId}\n\nமுற்றுப்பெற்றதும், 'CONFIRM' என்று பதிலளிக்கவும் அல்லது கீழே உள்ள பட்டனைத் தட்டவும்.",
         cod_success: "🎉 *ஆர்டர் உறுதி செய்யப்பட்டது!*\n\nஆர்டர் ஐடி: *{orderId}*\nமொத்தம்: *₹{total}*\nகட்டண முறை: *கேஷ் ஆன் டெலிவரி (COD)*\n\n✅ நாங்கள் உங்கள் ஆர்டரைத் தயாரிக்கிறோம்! டிராக்கிங் இணைப்பு விரைவில் அனுப்பப்படும்.\n🎁 நீங்கள் *{points} லாயல்டி புள்ளிகள்* பெற்றுள்ளீர்கள்!",
         online_success: "🎉 *கட்டணம் பெறப்பட்டு ஆர்டர் உறுதி செய்யப்பட்டது!*\n\nஆர்டர் ஐடி: *{orderId}*\nமொத்த கட்டணம்: *₹{total}*\n\n✅ உங்கள் கட்டணம் சரிபார்க்கப்பட்டது. ஆர்டர் அனுப்பப்படும் போது உங்களுக்கு அறிவிப்போம்!\n🎁 நீங்கள் *{points} லாயல்டி புள்ளிகள்* பெற்றுள்ளீர்கள்!",
-        support_menu: "💬 *மன்சரா உதவி மையம்* 💬\n\nவிவரங்களைப் பார்க்க ஒரு தலைப்பைத் தேர்ந்தெடுக்கவும்:\n\n*1️⃣ ஷிப்பிங் மற்றும் டெலிவரி கொள்கை*\n*2️⃣ வருவாய் மற்றும் பணத்தைத் திரும்பப்பெறும் கொள்கை*\n*3️⃣ ஆர்கானிக் சான்றிதழ்கள் மற்றும் சோர்சிங்*\n*4️⃣ சிக்கலைப் புகாரளிக்க / டிக்கெட் உருவாக்க*\n*5️⃣ எஜென்ட்டிடம் பேச 👤*\n*6️⃣ முதன்மை பட்டிக்குத் திரும்புக 🏠*",
+        support_menu: "💬 *மன்சரா உதவி மையம்* 💬\n\nவிவரங்களைப் பார்க்க ஒரு தலைப்பைத் தேர்ந்தெடுக்கவும்:\n\n*1️⃣ ஷிப்பிங் மற்றும் டெலிவரி கொள்கை*\n*2️⃣ வருவாய் மற்றும் பணத்தைத் திரும்பப்பெறும் கொள்கை*\n*3️⃣ இயற்கை உணவுகள் & சத்து மாவுகளின் நன்மைகள்*\n*4️⃣ சிக்கலைப் புகாரளிக்க / டிக்கெட் உருவாக்க*\n*5️⃣ எஜென்ட்டிடம் பேச 👤*\n*6️⃣ முதன்மை பட்டிக்குத் திரும்புக 🏠*",
         ticket_success: "✅ *டிக்கெட் வெற்றிகரமாக உருவாக்கப்பட்டது!*\n\nடிக்கெட் ஐடி: *{ticketId}*\nதலைப்பு: {subject}\n\nஎங்கள் வாடிக்கையாளர் ஆதரவு குழு இதை 12 மணி நேரத்திற்குள் சரிபார்த்து பதிலளிக்கும். நன்றி!",
         no_orders: "📦 நீங்கள் இன்னும் எந்த ஆர்டரும் செய்யவில்லை. ஆர்டர் செய்ய உலாவத் தொடங்குங்கள்!",
-        loyalty_info: "🎁 *மன்சரா லாயல்டி வெகுமதிகள்* 🎁\n\nஒவ்வொரு வாங்குதலுக்கும் புள்ளிகளைப் பெற்று அவற்றை தள்ளுபடியாகப் பயன்படுத்துங்கள்!\n\n*உங்கள் லாயல்டி புள்ளிகள்:* {points} புள்ளிகள்\n*மதிப்பு:* ₹{points}\n\n💡 *இது எப்படி செயல்படுகிறது:*\n- ஒவ்வொரு ஆர்டருக்கும் 5% லாயல்டி புள்ளிகள் கிடைக்கும்.\n- 1 புள்ளி = ₹1.\n- உங்கள் அடுத்த ஆர்டரில் புள்ளிகள் தள்ளுபடியாகக் கழிக்கப்படும்!\n\nஆர்கானிக் பொருட்களை வாங்க கீழே தட்டவும்!",
+        loyalty_info: "🎁 *மன்சரா லாயல்டி வெகுமதிகள்* 🎁\n\nஒவ்வொரு வாங்குதலுக்கும் புள்ளிகளைப் பெற்று அவற்றை தள்ளுபடியாகப் பயன்படுத்துங்கள்!\n\n*உங்கள் லாயல்டி புள்ளிகள்:* {points} புள்ளிகள்\n*மதிப்பு:* ₹{points}\n\n💡 *இது எப்படி செயல்படுகிறது:*\n- ஒவ்வொரு ஆர்டருக்கும் 5% லாயல்டி புள்ளிகள் கிடைக்கும்.\n- 1 புள்ளி = ₹1.\n- உங்கள் அடுத்த ஆர்டரில் புள்ளிகள் தள்ளுபடியாகக் கழிக்கப்படும்!\n\nஆரோக்கியமான பொருட்களை வாங்க கீழே தட்டவும்!",
         opt_out_success: "வெற்றிகரமாக விலகினீர்கள். இனி உங்களுக்கு விளம்பர செய்திகள் வராது. மீண்டும் இணைய 'START' என பதிலளிக்கவும்.",
         coupon_entry: "🎟️ *கியூபொன் குறியீடு உள்ளிடவும்:*\n\nஉங்கள் கியூபொன் குறியீட்டை டைப் செய்யவும் (எ.கா. 10% தள்ளுபடிக்கு *SAVE10*) அல்லது முந்தைய மெனுவிற்கு செல்ல 'CANCEL' என டைப் செய்யவும்:"
     }
@@ -361,13 +363,11 @@ async function handleBotReply(phone, messageText, contact) {
     }
 
     // --- PROCESS CATALOG CATEGORY SELECTIONS ---
-    if (msg.startsWith('cat_') || ['spices', 'dry fruits', 'oils', 'sweets', 'snacks'].includes(msg)) {
+    if (msg.startsWith('cat_') || ['health mixes', 'rice mixes', 'podi', 'combos'].includes(msg)) {
         let category = '';
-        if (msg === 'cat_spices' || msg === 'spices') category = 'Spices';
-        else if (msg === 'cat_dry_fruits' || msg === 'dry fruits') category = 'Dry Fruits';
-        else if (msg === 'cat_oils' || msg === 'oils') category = 'Oils';
-        else if (msg === 'cat_sweets' || msg === 'sweets') category = 'Sweets';
-        else if (msg === 'cat_snacks' || msg === 'snacks') category = 'Snacks';
+        if (msg === 'cat_health_mixes' || msg.includes('health')) category = 'Health Mixes';
+        else if (msg === 'cat_rice_podi' || msg.includes('podi') || msg.includes('rice')) category = 'Rice Mixes & Podi';
+        else if (msg === 'cat_combos' || msg.includes('combo')) category = 'Combos & Packs';
 
         if (category) {
             await sendCategoryProducts(phone, category, contact);
@@ -377,12 +377,10 @@ async function handleBotReply(phone, messageText, contact) {
 
     // Handle catalog navigation menu numbers
     if (contact.step === 'catalog_menu') {
-        if (msg === '1') { await sendCategoryProducts(phone, 'Spices', contact); return; }
-        if (msg === '2') { await sendCategoryProducts(phone, 'Dry Fruits', contact); return; }
-        if (msg === '3') { await sendCategoryProducts(phone, 'Oils', contact); return; }
-        if (msg === '4') { await sendCategoryProducts(phone, 'Sweets', contact); return; }
-        if (msg === '5') { await sendCategoryProducts(phone, 'Snacks', contact); return; }
-        if (msg === '6') { contact.step = 'main_menu'; await contact.save(); await sendMainMenu(phone, contact); return; }
+        if (msg === '1') { await sendCategoryProducts(phone, 'Health Mixes', contact); return; }
+        if (msg === '2') { await sendCategoryProducts(phone, 'Rice Mixes & Podi', contact); return; }
+        if (msg === '3') { await sendCategoryProducts(phone, 'Combos & Packs', contact); return; }
+        if (msg === '4') { contact.step = 'main_menu'; await contact.save(); await sendMainMenu(phone, contact); return; }
     }
 
     // --- ADD TO CART / WISHLIST ACTION ---
@@ -806,13 +804,11 @@ async function sendCatalogMenu(phone, contact) {
 
     const sections = [
         {
-            title: lang === 'en' ? "Food Categories" : "உணவு வகைகள்",
+            title: lang === 'en' ? "Product Categories" : "தயாரிப்பு வகைகள்",
             rows: [
-                { id: "cat_spices", title: lang === 'en' ? "🌶️ Spices" : "🌶️ மசாலாக்கள்", description: "Turmeric, powders, whole spices" },
-                { id: "cat_dry_fruits", title: lang === 'en' ? "🥜 Dry Fruits" : "🥜 உலர் பழங்கள்", description: "Premium almonds, cashew, walnuts" },
-                { id: "cat_oils", title: lang === 'en' ? "🛢️ Cold-Pressed Oils" : "🛢️ செக்கு எண்ணெய்", description: "Pure coconut, sesame oils" },
-                { id: "cat_sweets", title: lang === 'en' ? "🍯 Honey & Sweets" : "🍯 தேன் & இனிப்புகள்", description: "Raw forest honey, natural sweeteners" },
-                { id: "cat_snacks", title: lang === 'en' ? "🍪 Healthy Snacks" : "🍪 சத்து தின்பண்டங்கள்", description: "Millet cookies, roasted seeds" }
+                { id: "cat_health_mixes", title: lang === 'en' ? "🥣 Health Mixes & Porridge" : "🥣 சத்து மாவுகள் & கஞ்சி", description: "Ragi Choco Malt, Nutriminix multigrain mix" },
+                { id: "cat_rice_podi", title: lang === 'en' ? "🌾 Rice Mixes & Podi" : "🌾 சாதப் பொடிகள்", description: "Paruppu, Pirandai, Curry Leaves & Coriander Podi" },
+                { id: "cat_combos", title: lang === 'en' ? "🎁 Combos & Packs" : "🎁 சிறப்பு பேக்குகள்", description: "5-Flavor traditional rice mix podi combo pack" }
             ]
         },
         {
