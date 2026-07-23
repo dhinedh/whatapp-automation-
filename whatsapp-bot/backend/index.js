@@ -135,7 +135,8 @@ async function sendImageMessage(to, imageUrl, captionText = "") {
                     link: imageUrl,
                     ...(captionText ? { caption: captionText } : {})
                 }
-            }
+            },
+            timeout: 5000
         });
     } catch (error) {
         console.error("Error sending image message:", error.response ? error.response.data : error.message);
@@ -652,7 +653,7 @@ async function handleBotReply(phone, messageText, contact) {
                 const earnedPoints = Math.floor(lastOrder.total * 0.05);
                 contact.loyaltyPoints += earnedPoints;
                 contact.step = 'main_menu';
-                await contact.save();
+                await contact.save();   
 
                 const successMsg = t.online_success
                     .replace('{orderId}', lastOrder.orderId)
@@ -901,8 +902,8 @@ async function sendMainMenu(phone, contact) {
     contact.step = 'main_menu';
     await contact.save();
 
-    // Send Mansara Foods Product Banner Image
-    await sendImageMessage(phone, BANNER_IMAGE_URL, lang === 'en' ? "🌿 *MANSARA FOODS* — Premium, Healthy, & Delicious!" : "🌿 *மன்சரா ஃபுட்ஸ்* — சுவையான பாராம்பரிய சத்துணவுகள்!");
+    // Send Mansara Foods Product Banner Image asynchronously
+    sendImageMessage(phone, BANNER_IMAGE_URL, lang === 'en' ? "🌿 *MANSARA FOODS* — Premium, Healthy, & Delicious!" : "🌿 *மன்சரா ஃபுட்ஸ்* — சுவையான பாராம்பரிய சத்துணவுகள்!").catch(() => {});
 
     const sections = [
         {
