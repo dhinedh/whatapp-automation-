@@ -88,6 +88,8 @@ const contactSchema = new mongoose.Schema({
         status: { type: String, default: "Open" }, // Open, Resolved
         createdAt: { type: Date, default: Date.now }
     }],
+    selectedCategory: { type: String, default: "" },
+    selectedProductId: { type: String, default: "" },
     step: { type: String, default: "welcome" }, // welcome, consent_pending, language_selection, main_menu, checkout_address, checkout_payment_mode, payment_pending, coupon_entry, orders_menu, reschedule_entry, cancel_entry, support_menu, ticket_entry
     funnelState: { type: String, default: "onboarding" } // onboarding, browsing, cart, checkout, completed
 });
@@ -96,13 +98,28 @@ const Contact = mongoose.model('Contact', contactSchema);
 
 // --- Mansara Foods Products Database (mansarafoods.com) ---
 const PRODUCTS = [
-    { id: "prod_ragi_choco", name: "Mansara Ragi Choco Malt (250g)", category: "Health Mixes", price: 250, stock: 80, description: "Nutritious health drink mix combining pure Ragi (finger millet) with rich cocoa." },
-    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Health Mix (250g)", category: "Health Mixes", price: 200, stock: 100, description: "Traditional health mix with Kavuni black rice, samba wheat, barley & millets." },
-    { id: "prod_paruppu_podi", name: "Homestyle Paruppu Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 150, description: "Authentic South Indian roasted lentil rice mix powder." },
-    { id: "prod_pirandai_podi", name: "Pirandai Power Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 120, description: "Herbal Veldt Grape rice mix powder, traditional recipe for digestion & joint health." },
-    { id: "prod_karuveppilai_podi", name: "Karuveppilai Special Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 85, stock: 90, description: "Aromatic Curry Leaves rice powder rich in natural iron & traditional flavor." },
-    { id: "prod_kothamalli_podi", name: "Kothamalli Aroma Rice Mix Podi (100g)", category: "Rice Mixes & Podi", price: 68, stock: 75, description: "Fresh Coriander rice mix powder packed with authentic herbal goodness." },
-    { id: "prod_rice_combo", name: "5-Flavor Traditional Rice Mix Podi Combo (5x100g)", category: "Combos & Packs", price: 400, stock: 40, description: "Special value pack featuring 5 authentic traditional rice mix podi varieties." }
+    // Pickles
+    { id: "prod_lemon_pickle", name: "Lemon Pickle", category: "Pickles", weight: "500g", price: 180, stock: 100, description: "Authentic homestyle Lemon Pickle prepared with handpicked fresh lemons, cold-pressed sesame oil, and traditional spices." },
+    { id: "prod_mango_pickle", name: "Avakai Mango Pickle", category: "Pickles", weight: "500g", price: 190, stock: 80, description: "Traditional spicy raw mango pickle made using secret family recipe." },
+    { id: "prod_garlic_pickle", name: "Poondu Garlic Pickle", category: "Pickles", weight: "250g", price: 160, stock: 60, description: "Rich and flavorful garlic pickle crafted with roasted garlic cloves and natural spices." },
+
+    // Masala Powders
+    { id: "prod_sambar_powder", name: "Grandma Sambar Powder", category: "Masala Powders", weight: "250g", price: 140, stock: 120, description: "Aromatic South Indian sambar powder freshly ground from handpicked spices." },
+    { id: "prod_rasam_powder", name: "Pepper Cumin Rasam Powder", category: "Masala Powders", weight: "250g", price: 140, stock: 100, description: "Authentic rasam powder rich in black pepper, cumin, and coriander." },
+    { id: "prod_idli_podi", name: "Gunpowder Idli Milagai Podi", category: "Masala Powders", weight: "200g", price: 110, stock: 150, description: "Spicy roasted dal and red chili powder for idlis and dosas." },
+
+    // Ready Mix
+    { id: "prod_ragi_choco", name: "Ragi Choco Malt", category: "Ready Mix", weight: "250g", price: 250, stock: 80, description: "Nutritious health drink mix combining pure Ragi (finger millet) with rich cocoa." },
+    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Health Mix", category: "Ready Mix", weight: "250g", price: 200, stock: 100, description: "Traditional health mix with Kavuni black rice, samba wheat, barley & millets." },
+    { id: "prod_kavuni_mix", name: "Kavuni Black Rice Porridge Mix", category: "Ready Mix", weight: "250g", price: 220, stock: 90, description: "Royal Kavuni black rice porridge mix loaded with antioxidants and vitamins." },
+
+    // Snacks
+    { id: "prod_millet_murukku", name: "Crispy Millet Murukku", category: "Snacks", weight: "200g", price: 120, stock: 90, description: "Crunchy tea-time snack made with organic millets and cold-pressed oil." },
+    { id: "prod_ribbon_pakoda", name: "Traditional Ribbon Pakoda", category: "Snacks", weight: "200g", price: 110, stock: 85, description: "Homestyle ribbon pakoda savory prepared with gram flour and butter." },
+
+    // Oils & Ghee
+    { id: "prod_sesame_oil", name: "Cold-Pressed Chekku Sesame Oil", category: "Oils & Ghee", weight: "1L", price: 420, stock: 50, description: "100% pure cold-pressed sesame oil extracted using traditional wooden chekku." },
+    { id: "prod_cow_ghee", name: "Pure Desi Cow Ghee", category: "Oils & Ghee", weight: "500ml", price: 480, stock: 40, description: "Aromatic Bilona method pure desi cow ghee made from fresh milk." }
 ];
 
 // --- Send Message Functions ---
@@ -294,9 +311,9 @@ async function handleBotReply(phone, messageText, contact) {
         contact.funnelState = 'browsing';
         await contact.save();
         await sendInteractiveButtons(phone, t.opt_in_thank_you + "\n\n" + t.main_menu, [
-            { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "कैटलॉग देखें 📁" },
-            { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "कार्ट देखें 🛒" },
-            { id: "btn_support", title: lang === 'en' ? "Support 💬" : "सहायता 💬" }
+            { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "கடைப் பட்டியல் 📁" },
+            { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் பார்க்க 🛒" },
+            { id: "btn_support", title: lang === 'en' ? "Support 💬" : "உதவி 💬" }
         ], BANNER_IMAGE_URL);
         return;
     }
@@ -309,7 +326,7 @@ async function handleBotReply(phone, messageText, contact) {
         
         const handoffMsg = lang === 'en' 
             ? `👋 *Connecting you to our team!*\n\nOur team member will respond shortly.\n\n📞 *Direct Call/WhatsApp:* +91 96000 67611\n_Hours: 9 AM - 6 PM (Mon-Sat)_`
-            : `👋 *आपको हमारी टीम से जोड़ रहे हैं!*\n\nहमारा टीम सदस्य जल्द ही जवाब देगा।\n\n📞 *सीधा कॉल/व्हाट्सएप:* +91 96000 67611\n_समय: सुबह 9 बजे से शाम 6 बजे तक_`;
+            : `👋 *எங்கள் குழுவோடு உங்களை இணைக்கிறோம்!*\n\nஎங்கள் குழு உறுப்பினர் விரைவில் பதிலளிப்பார்.\n\n📞 *நேரடி தொடர்பு/வாட்ஸ்அப்:* +91 96000 67611\n_நேரம்: காலை 9 - மாலை 6 (திங்கள்-சனி)_`;
         
         await sendMessage(phone, handoffMsg);
         
@@ -374,119 +391,351 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    // Main Menu navigation from buttons or text
-    if (msg === 'btn_menu' || msg === 'main menu' || msg === 'menu') {
-        contact.step = 'main_menu';
-        await contact.save();
+    // Greeting check (hi, hello, hey, start, menu, main menu, etc.)
+    if (['hi', 'hello', 'hey', 'start', 'menu', 'main menu', 'btn_menu', 'hi!'].includes(msg) || msg === '0') {
         await sendMainMenu(phone, contact);
         return;
     }
 
-    // --- PROCESS DEALER REGISTRATION & BULK ORDER INPUTS ---
-    if (contact.step === 'dealer_registration') {
-        contact.step = 'main_menu';
-        contact.lead_status = 'Dealer Lead';
-        contact.tickets.push({ ticketId: `DLR-${Date.now().toString().slice(-4)}`, subject: `Dealer Reg: ${messageText.slice(0, 30)}` });
-        await contact.save();
-        const ackMsg = lang === 'en'
-            ? `✅ *Dealer Registration Received!*\n\nThank you! Our wholesale manager will review your submission and contact you shortly.`
-            : `✅ *டீலர் பதிவு பெறப்பட்டது!*\n\nநன்றி! எங்கள் குழு விரைவில் உங்களைத் தொடர்பு கொள்ளும்.`;
-        await sendInteractiveButtons(phone, ackMsg, [{ id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }]);
-        return;
+    // --- 1. MAIN MENU ROUTING (Options 1 to 4) ---
+    if (contact.step === 'main_menu' || msg === '1' || msg === '2' || msg === '3' || msg === '4') {
+        // Option 1: Shop Products
+        if (msg === '1' || msg === '1️⃣' || msg.includes('shop') || msg === 'opt_1_products') {
+            contact.step = 'shop_products';
+            await contact.save();
+            const shopText = `🛒 Shop Products\n\n1. View Product Categories\n2. Today's Offers\n3. New Arrivals\n4. Recipes\n5. Back to Main Menu`;
+            await sendMessage(phone, shopText);
+            return;
+        }
+        // Option 2: Orders
+        if (msg === '2' || msg === '2️⃣' || msg.includes('order') || msg === 'opt_2_order') {
+            contact.step = 'orders_menu';
+            await contact.save();
+            const ordersText = `📦 Orders\n\n1. Place New Order\n2. Track My Order\n3. Reorder Previous Purchase\n4. Order History\n5. Payment Status\n6. Back`;
+            await sendMessage(phone, ordersText);
+            return;
+        }
+        // Option 3: Business (Dealers & Bulk Orders)
+        if (msg === '3' || msg === '3️⃣' || msg.includes('business') || msg.includes('dealer') || msg.includes('bulk')) {
+            contact.step = 'business_menu';
+            await contact.save();
+            const bizText = `🏪 Business\n\n1. Dealer Registration\n2. Distributor Registration\n3. Bulk Order\n4. Request Price List\n5. Become a Partner\n6. Contact Sales Team\n7. Back`;
+            await sendMessage(phone, bizText);
+            return;
+        }
+        // Option 4: Help & Support
+        if (msg === '4' || msg === '4️⃣' || msg.includes('help') || msg.includes('support')) {
+            contact.step = 'support_menu';
+            await contact.save();
+            const supportText = `💬 Help & Support\n\n1. FAQs\n2. Store Locator\n3. Customer Support\n4. Raise a Complaint\n5. Feedback\n6. Contact Us\n7. Back`;
+            await sendMessage(phone, supportText);
+            return;
+        }
     }
 
-    if (contact.step === 'bulk_orders') {
-        contact.step = 'main_menu';
-        contact.lead_status = 'Bulk Order Enquiry';
-        contact.tickets.push({ ticketId: `BLK-${Date.now().toString().slice(-4)}`, subject: `Bulk Enquiry: ${messageText.slice(0, 30)}` });
-        await contact.save();
-        const ackMsg = lang === 'en'
-            ? `✅ *Bulk Order Inquiry Submitted!*\n\nThank you! Our B2B sales team will calculate your volume discount and reply with a formal quote shortly.`
-            : `✅ *மொத்த ஆர்டர் கோரிக்கை சமர்ப்பிக்கப்பட்டது!*\n\nநன்றி! எங்கள் விற்பனைக் குழு விரைவில் விலை விவரங்களை அனுப்பும்.`;
-        await sendInteractiveButtons(phone, ackMsg, [{ id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }]);
-        return;
+    // --- 2. SHOP PRODUCTS MENU FLOW ---
+    if (contact.step === 'shop_products') {
+        if (msg === '1' || msg.includes('category') || msg.includes('categories')) {
+            contact.step = 'product_categories';
+            await contact.save();
+            const catText = `🥫 Product Categories\n\n1. Pickles\n2. Masala Powders\n3. Ready Mix\n4. Snacks\n5. Oils & Ghee\n6. View All Products\n7. Back`;
+            await sendMessage(phone, catText);
+            return;
+        }
+        if (msg === '2' || msg.includes('offer')) {
+            const offerText = `🏷️ Today's Offers\n\n🔥 10% OFF on all Health Mixes (Code: WELCOME10)\n🔥 Buy 2 Podi Packs & Get 1 Free!\n🔥 Free Shipping on orders above ₹500\n\nReply "1" to View Product Categories or "5" for Main Menu.`;
+            await sendMessage(phone, offerText);
+            return;
+        }
+        if (msg === '3' || msg.includes('new') || msg.includes('arrival')) {
+            const newText = `✨ New Arrivals\n\n1. 🌾 Kavuni Black Rice Porridge Mix (250g - ₹220)\n2. 🍋 Lemon Pickle (500g - ₹180)\n3. 🍫 Ragi Choco Malt (250g - ₹250)\n\nReply "1" to View Product Categories or "5" for Main Menu.`;
+            await sendMessage(phone, newText);
+            return;
+        }
+        if (msg === '4' || msg.includes('recipe')) {
+            const recipeText = `🍳 Recipes\n\n1. 🥣 Ragi Choco Malt Drink\n2. 🌾 Multigrain Health Mix Porridge\n3. 🍚 Authentic Podi Rice with Ghee\n\nReply "1" to View Product Categories or "5" for Main Menu.`;
+            await sendMessage(phone, recipeText);
+            return;
+        }
+        if (msg === '5' || msg === 'back' || msg.includes('main menu')) {
+            await sendMainMenu(phone, contact);
+            return;
+        }
     }
 
-    // --- PROCESS MAIN MENU OPTIONS (1 to 10) ---
-    if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
-        // Option 1: View Products
-        if (msg === '1' || msg === 'opt_1_products' || msg.includes('product') || msg.includes('browse') || msg === 'btn_catalog') {
-            await sendCatalogMenu(phone, contact);
+    // --- 3. PRODUCT CATEGORIES FLOW ---
+    if (contact.step === 'product_categories') {
+        let catName = "";
+        if (msg === '1' || msg.includes('pickle')) catName = "Pickles";
+        else if (msg === '2' || msg.includes('masala')) catName = "Masala Powders";
+        else if (msg === '3' || msg.includes('ready')) catName = "Ready Mix";
+        else if (msg === '4' || msg.includes('snack')) catName = "Snacks";
+        else if (msg === '5' || msg.includes('oil') || msg.includes('ghee')) catName = "Oils & Ghee";
+        else if (msg === '6' || msg.includes('all')) catName = "All";
+
+        if (catName) {
+            contact.step = 'category_items_list';
+            contact.selectedCategory = catName;
+            await contact.save();
+
+            let items = PRODUCTS;
+            if (catName !== "All") {
+                items = PRODUCTS.filter(p => p.category === catName);
+            }
+
+            let listText = `🥫 ${catName === "All" ? "All Products" : catName}\n\n`;
+            items.forEach((item, index) => {
+                listText += `${index + 1}. ${item.name} (${item.weight} - ₹${item.price})\n`;
+            });
+            listText += `${items.length + 1}. Back`;
+
+            await sendMessage(phone, listText);
             return;
         }
-        // Option 2: Place an Order
-        if (msg === '2' || msg === 'opt_2_order' || msg.includes('place order') || msg.includes('checkout') || msg === 'btn_cart') {
-            await sendCartView(phone, contact);
+
+        if (msg === '7' || msg === 'back') {
+            contact.step = 'shop_products';
+            await contact.save();
+            const shopText = `🛒 Shop Products\n\n1. View Product Categories\n2. Today's Offers\n3. New Arrivals\n4. Recipes\n5. Back to Main Menu`;
+            await sendMessage(phone, shopText);
             return;
         }
-        // Option 3: Track My Order
-        if (msg === '3' || msg === 'opt_3_track' || msg.includes('track') || msg.includes('my order') || msg === 'btn_orders') {
-            await sendOrdersMenu(phone, contact);
+    }
+
+    // --- 4. CATEGORY ITEMS SELECTION ---
+    if (contact.step === 'category_items_list') {
+        let items = PRODUCTS;
+        if (contact.selectedCategory && contact.selectedCategory !== "All") {
+            items = PRODUCTS.filter(p => p.category === contact.selectedCategory);
+        }
+
+        const choice = parseInt(msg);
+        if (!isNaN(choice) && choice >= 1 && choice <= items.length) {
+            const selectedProd = items[choice - 1];
+            contact.selectedProductId = selectedProd.id;
+            contact.step = 'product_item_view';
+            await contact.save();
+
+            const icon = selectedProd.category === 'Pickles' ? '🍋' : selectedProd.category === 'Oils & Ghee' ? '🧈' : selectedProd.category === 'Snacks' ? '🥨' : selectedProd.category === 'Masala Powders' ? '🌶️' : '🥣';
+            
+            const cardText = `${icon} ${selectedProd.name}\n\n✅ ${selectedProd.weight}\n✅ ₹${selectedProd.price}\n\n1. View Details\n2. Add to Cart\n3. Buy Now\n4. Back`;
+
+            await sendMessage(phone, cardText);
             return;
         }
-        // Option 4: Dealer Registration
-        if (msg === '4' || msg === 'opt_4_dealer' || msg.includes('dealer') || msg.includes('distributor') || msg.includes('partner')) {
+
+        if (msg === `${items.length + 1}` || msg === 'back' || msg.includes('back')) {
+            contact.step = 'product_categories';
+            await contact.save();
+            const catText = `🥫 Product Categories\n\n1. Pickles\n2. Masala Powders\n3. Ready Mix\n4. Snacks\n5. Oils & Ghee\n6. View All Products\n7. Back`;
+            await sendMessage(phone, catText);
+            return;
+        }
+    }
+
+    // --- 5. INDIVIDUAL PRODUCT ITEM ACTIONS ---
+    if (contact.step === 'product_item_view') {
+        const selectedProd = PRODUCTS.find(p => p.id === contact.selectedProductId) || PRODUCTS[0];
+        const icon = selectedProd.category === 'Pickles' ? '🍋' : selectedProd.category === 'Oils & Ghee' ? '🧈' : selectedProd.category === 'Snacks' ? '🥨' : selectedProd.category === 'Masala Powders' ? '🌶️' : '🥣';
+
+        // 1. View Details
+        if (msg === '1' || msg.includes('detail')) {
+            const detailsText = `ℹ️ *${selectedProd.name} Details*\n\n${selectedProd.description}\n\nWeight: ${selectedProd.weight}\nPrice: ₹${selectedProd.price}\nStock: Available\n\n${icon} ${selectedProd.name}\n\n✅ ${selectedProd.weight}\n✅ ₹${selectedProd.price}\n\n1. View Details\n2. Add to Cart\n3. Buy Now\n4. Back`;
+            await sendMessage(phone, detailsText);
+            return;
+        }
+
+        // 2. Add to Cart
+        if (msg === '2' || msg.includes('add')) {
+            const existingItem = contact.cart.find(item => item.productId === selectedProd.id);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                contact.cart.push({ productId: selectedProd.id, name: selectedProd.name, price: selectedProd.price, quantity: 1 });
+            }
+            await contact.save();
+
+            const addedMsg = `🛒 Added *${selectedProd.name} (${selectedProd.weight})* to your cart!\nTotal Cart Items: ${contact.cart.length}\n\nReply "1" to Checkout, "2" to View Cart, or "4" to Back.`;
+            await sendMessage(phone, addedMsg);
+            return;
+        }
+
+        // 3. Buy Now
+        if (msg === '3' || msg.includes('buy')) {
+            const existingItem = contact.cart.find(item => item.productId === selectedProd.id);
+            if (!existingItem) {
+                contact.cart.push({ productId: selectedProd.id, name: selectedProd.name, price: selectedProd.price, quantity: 1 });
+            }
+            contact.step = 'checkout_address';
+            await contact.save();
+
+            const checkoutMsg = `💳 *Checkout - Shipping Details*\n\nPlease type your complete delivery address (Street, City, Pincode):`;
+            await sendMessage(phone, checkoutMsg);
+            return;
+        }
+
+        // 4. Back
+        if (msg === '4' || msg === 'back' || msg.includes('back')) {
+            contact.step = 'product_categories';
+            await contact.save();
+            const catText = `🥫 Product Categories\n\n1. Pickles\n2. Masala Powders\n3. Ready Mix\n4. Snacks\n5. Oils & Ghee\n6. View All Products\n7. Back`;
+            await sendMessage(phone, catText);
+            return;
+        }
+    }
+
+    // --- 6. ORDERS MENU FLOW ---
+    if (contact.step === 'orders_menu') {
+        if (msg === '1' || msg.includes('place')) {
+            contact.step = 'shop_products';
+            await contact.save();
+            const shopText = `🛒 Shop Products\n\n1. View Product Categories\n2. Today's Offers\n3. New Arrivals\n4. Recipes\n5. Back to Main Menu`;
+            await sendMessage(phone, shopText);
+            return;
+        }
+        if (msg === '2' || msg.includes('track')) {
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
+                const trackMsg = `📦 *Order Tracking*\n\nOrder ID: *${lastOrder.orderId}*\nStatus: *${lastOrder.status}*\nPayment: *${lastOrder.paymentStatus}*\nTotal: ₹${lastOrder.total}\nTracking Link: ${lastOrder.trackingLink || 'https://track.shiprocket.in/mansarafoods/' + lastOrder.orderId}\n\nReply "6" to return to Orders menu.`;
+                await sendMessage(phone, trackMsg);
+            } else {
+                await sendMessage(phone, "📦 You haven't placed any orders yet. Reply \"1\" to Place New Order!");
+            }
+            return;
+        }
+        if (msg === '3' || msg.includes('reorder')) {
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
+                lastOrder.items.forEach(i => {
+                    contact.cart.push({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity });
+                });
+                contact.step = 'checkout_address';
+                await contact.save();
+                await sendMessage(phone, `🔄 Added items from Order *${lastOrder.orderId}* to your cart!\n\nPlease type your delivery address to proceed with reorder:`);
+            } else {
+                await sendMessage(phone, "📦 No previous orders found to reorder. Reply \"1\" to Place New Order!");
+            }
+            return;
+        }
+        if (msg === '4' || msg.includes('history')) {
+            if (contact.orders && contact.orders.length > 0) {
+                let historyText = `📜 *Order History*\n\n`;
+                contact.orders.forEach((o, idx) => {
+                    historyText += `${idx + 1}. *${o.orderId}* - ₹${o.total} (${o.status})\nDate: ${new Date(o.createdAt).toLocaleDateString()}\n\n`;
+                });
+                historyText += `Reply "6" to return to Orders menu.`;
+                await sendMessage(phone, historyText);
+            } else {
+                await sendMessage(phone, "📦 No order history available yet.");
+            }
+            return;
+        }
+        if (msg === '5' || msg.includes('payment')) {
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
+                const payMsg = `💳 *Payment Status*\n\nOrder ID: *${lastOrder.orderId}*\nAmount: ₹${lastOrder.total}\nPayment Method: ${lastOrder.paymentStatus}\nStatus: ${lastOrder.paymentStatus === 'Paid' ? '✅ Paid' : lastOrder.paymentStatus === 'COD' ? '💵 Cash on Delivery' : '⏳ Pending'}`;
+                await sendMessage(phone, payMsg);
+            } else {
+                await sendMessage(phone, "📦 No active orders or pending payments.");
+            }
+            return;
+        }
+        if (msg === '6' || msg === 'back' || msg.includes('back')) {
+            await sendMainMenu(phone, contact);
+            return;
+        }
+    }
+
+    // --- 7. BUSINESS MENU FLOW ---
+    if (contact.step === 'business_menu') {
+        if (msg === '1' || msg.includes('dealer')) {
             contact.step = 'dealer_registration';
             await contact.save();
-            const dealerMsg = lang === 'en'
-                ? `🤝 *Mansara Foods Dealer Registration* 🤝\n\nPartner with us to distribute authentic organic health mixes & traditional food products in your region!\n\nPlease reply with your details:\n1. Your Name / Business Name\n2. City / District & State\n3. Contact Phone Number & Email\n\nOur partnership team will get in touch with you within 24 hours.`
-                : `🤝 *மன்சரா ஃபுட்ஸ் டீலர் பதிவு* 🤝\n\nஉங்கள் பகுதியில் எங்கள் பாரம்பரிய உணவுப் பொருட்களை விநியோகிக்க எங்களோடு இணையுங்கள்!\n\nதயவுசெய்து உங்கள் விவரங்களை எழுதவும்:\n1. உங்கள் பெயர் / வணிகப் பெயர்\n2. மாவட்டம் & மாநிலம்\n3. தொலைபேசி எண்\n\nஎங்கள் குழு 24 மணி நேரத்திற்குள் உங்களைத் தொடர்பு கொள்ளும்.`;
+            const dealerMsg = `🤝 *Mansara Foods Dealer Registration*\n\nPartner with us to distribute authentic traditional food products in your region!\n\nPlease reply with:\n1. Your Name / Business Name\n2. City & District\n3. Contact Phone Number\n\nOur partnership team will get in touch with you within 24 hours.`;
             await sendMessage(phone, dealerMsg);
             return;
         }
-        // Option 5: Bulk Orders
-        if (msg === '5' || msg === 'opt_5_bulk' || msg.includes('bulk') || msg.includes('wholesale')) {
+        if (msg === '2' || msg.includes('distributor')) {
+            contact.step = 'distributor_registration';
+            await contact.save();
+            const distMsg = `🚚 *Mansara Foods Distributor Network*\n\nExpand your business with fast-selling organic health products!\n\nPlease reply with:\n1. Company / Enterprise Name\n2. Operating Districts / State\n3. GST / FSSAI Number (if available)\n4. Contact Phone & Email\n\nOur regional sales head will call you shortly.`;
+            await sendMessage(phone, distMsg);
+            return;
+        }
+        if (msg === '3' || msg.includes('bulk')) {
             contact.step = 'bulk_orders';
             await contact.save();
-            const bulkMsg = lang === 'en'
-                ? `📦 *Mansara Bulk & Wholesale Orders* 📦\n\nWe supply bulk quantities for corporate gifting, events, restaurants & institutions.\n\nPlease type the products and quantity you require (e.g. *50 Packs Ragi Choco Malt, 100 Packs Paruppu Podi*).\n\nOur B2B sales team will send you custom wholesale pricing!`
-                : `📦 *மன்சரா மொத்த மற்றும் மொத்த விற்பனை ஆர்டர்கள்* 📦\n\nநிறுவனங்கள், விழாக்கள் மற்றும் உணவகங்களுக்கு மொத்தமாக விநியோகம் செய்கிறோம்.\n\nஉங்களுக்குத் தேவையான பொருட்கள் மற்றும் அளவைக் குறிப்பிடவும்.\n\nஎங்கள் விற்பனைக் குழு உங்களுக்கு பிரத்யேக மொத்த விலையை அனுப்பும்!`;
+            const bulkMsg = `📦 *Bulk & Wholesale Orders*\n\nWe supply bulk quantities for corporate gifting, events, restaurants & institutions.\n\nPlease type the products and quantity required (e.g., *50 Packs Ragi Choco Malt, 100 Packs Lemon Pickle*).\n\nOur B2B sales team will send you custom wholesale pricing!`;
             await sendMessage(phone, bulkMsg);
             return;
         }
-        // Option 6: Offers & Discounts
-        if (msg === '6' || msg === 'opt_6_offers' || msg.includes('offer') || msg.includes('discount') || msg.includes('coupon')) {
-            await sendLoyaltyInfo(phone, contact);
+        if (msg === '4' || msg.includes('price')) {
+            const priceMsg = `📄 *Mansara B2B Wholesale Price List Summary*\n\n1. Ragi Choco Malt (50+ units): ₹200 / unit\n2. Health Mixes (50+ units): ₹160 / unit\n3. Podi Varieties (100+ units): ₹65 / unit\n4. Pickles (50+ units): ₹140 / unit\n5. Cold-Pressed Oils (20+ L): ₹350 / L\n\nReply "3" to submit a formal bulk quote request, or "7" to go Back.`;
+            await sendMessage(phone, priceMsg);
             return;
         }
-        // Option 7: Recipes
-        if (msg === '7' || msg === 'opt_7_recipes' || msg.includes('recipe') || msg.includes('dish') || msg.includes('cook')) {
-            const recipeMsg = lang === 'en'
-                ? `🍳 *Mansara Healthy Traditional Recipes* 🍳\n\nTry these delicious, nutrient-rich dishes at home:\n\n🥣 *1. Ragi Choco Malt Drink:* Mix 2 tsp Mansara Ragi Choco Malt in warm milk/water. Stir well & enjoy a healthy energy boost!\n\n🌾 *2. Kavuni Multigrain Porridge:* Boil 3 tbsp Nutriminix Health Mix with 2 cups of water. Add a pinch of salt & fresh buttermilk.\n\n🍚 *3. Authentic Podi Rice:* Mix 2 tbsp Paruppu or Pirandai Podi with hot steamed rice and a spoonful of pure Ghee.\n\nTap below to buy the ingredients!`
-                : `🍳 *மன்சரா ஆரோக்கியமான பாரம்பரிய செய்முறைகள்* 🍳\n\nசுவையான ஆரோக்கிய உணவுகள்:\n\n🥣 *1. ராகி சோக்கோ மால்ட்:* 2 ஸ்பூன் மன்சரா ராகி சோக்கோ மால்ட்டை வெதுவெதுப்பான பாலில் கலந்து குடிக்கவும்.\n\n🌾 *2. சத்து மாவு கஞ்சி:* 3 ஸ்பூன் நியூட்ரிமினிக்ஸ் சத்து மாவை 2 கப் தண்ணீரில் கொதிக்க வைத்து, சிறிதளவு உப்பு மற்றும் மோர் சேர்க்கவும்.\n\n🍚 *3. சுவையான பொடி சாதம்:* சூடான சாதத்தில் 2 ஸ்பூன் பருப்பு அல்லது பிரண்டை பொடி மற்றும் நெய் கலந்து சாப்பிடவும்.`;
-            await sendInteractiveButtons(phone, recipeMsg, [
-                { id: "btn_catalog", title: lang === 'en' ? "Shop Ingredients 🛍️" : "பொருட்கள் வாங்க 🛍️" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
-            ]);
+        if (msg === '5' || msg.includes('partner')) {
+            contact.step = 'partner_registration';
+            await contact.save();
+            const partnerMsg = `💼 *Become a Partner*\n\nInterested in co-branding, white-labeling, or export partnerships?\n\nPlease reply with your proposal summary and phone number:`;
+            await sendMessage(phone, partnerMsg);
             return;
         }
-        // Option 8: Store Locator
-        if (msg === '8' || msg === 'opt_8_store' || msg.includes('store') || msg.includes('location') || msg.includes('address')) {
-            const storeMsg = lang === 'en'
-                ? `📍 *Mansara Foods Outlets & Online Store* 📍\n\n🏢 *Head Office & Experience Store:*\nMansara Foods Pvt Ltd, Chennai, Tamil Nadu - 600001\n📞 Support: +91 88388 87064\n\n🌐 *Official Online Shop:* https://mansarafoods.com\n🚚 *Delivery:* Fast delivery available across PAN India & select international locations.\n\nTap below to order online!`
-                : `📍 *மன்சரா ஃபுட்ஸ் கடைகள் & ஆன்லைன் ஸ்டோர்* 📍\n\n🏢 *தலைமை அலுவலகம்:*\nமன்சரா ஃபுட்ஸ் பிரைவேட் லிமிடெட், சென்னை, தமிழ்நாடு.\n📞 உதவி: +91 88388 87064\n\n🌐 *ஆன்லைன் கடை:* https://mansarafoods.com\n🚚 *டெலிவரி:* இந்தியா முழுவதும் விரைவான விநியோகம்.`;
-            await sendInteractiveButtons(phone, storeMsg, [
-                { id: "btn_catalog", title: lang === 'en' ? "Order Online 🛍️" : "ஆன்லைனில் ஆர்டர் செய்ய 🛍️" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
-            ]);
-            return;
-        }
-        // Option 9: Customer Support
-        if (msg === '9' || msg === 'opt_9_support' || msg.includes('support') || msg.includes('help') || msg === 'btn_support') {
-            await sendSupportMenu(phone, contact);
-            return;
-        }
-        // Option 10: Contact Sales Team
-        if (msg === '10' || msg === 'opt_10_sales' || msg.includes('sales') || msg.includes('contact') || msg.includes('human') || msg === 'btn_human') {
+        if (msg === '6' || msg.includes('sales')) {
             contact.is_paused = true;
             contact.step = 'human_takeover';
             await contact.save();
-            
-            const handoffMsg = lang === 'en' 
-                ? `👋 *Connecting you to the Mansara Sales Team!*\n\nOur team representative will respond to your chat shortly.\n\n📞 *Direct Phone / WhatsApp:* +91 88388 87064 / +91 79045 07105\n_Hours: 9 AM - 7 PM (Mon-Sat)_`
-                : `👋 *மன்சரா விற்பனைக் குழுவோடு உங்களை இணைக்கிறோம்!*\n\nஎங்கள் விற்பனை பிரதிநிதி விரைவில் பதிலளிப்பார்.\n\n📞 *தொடர்பு எண்:* +91 88388 87064 / +91 79045 07105`;
-            
-            await sendMessage(phone, handoffMsg);
+            const salesMsg = `👋 *Connecting you to the Mansara Sales Team!*\n\nOur sales representative will respond to your chat shortly.\n\n📞 *Direct Sales Phone / WhatsApp:* +91 88388 87064 / +91 79045 07105\n_Hours: 9 AM - 6 PM (Mon-Sat)_`;
+            await sendMessage(phone, salesMsg);
+            return;
+        }
+        if (msg === '7' || msg === 'back' || msg.includes('back')) {
+            await sendMainMenu(phone, contact);
+            return;
+        }
+    }
+
+    // --- 8. HELP & SUPPORT MENU FLOW ---
+    if (contact.step === 'support_menu') {
+        if (msg === '1' || msg.includes('faq')) {
+            const faqMsg = `💬 *Help & Support - FAQs*\n\n1. *How long does shipping take?*\n- Tamil Nadu: 2-3 days\n- Rest of India: 4-6 days\n\n2. *Are products 100% natural?*\n- Yes! Zero artificial preservatives or chemicals.\n\n3. *Payment options?*\n- UPI, Credit/Debit Cards, NetBanking & COD.\n\nReply "7" to return to Support Menu.`;
+            await sendMessage(phone, faqMsg);
+            return;
+        }
+        if (msg === '2' || msg.includes('store') || msg.includes('locator')) {
+            const storeMsg = `📍 *Store Locator*\n\n🏢 *Head Office & Experience Store:*\nMansara Foods Pvt Ltd, Chennai, Tamil Nadu - 600001\n📞 Phone: +91 88388 87064\n\n🌐 *Official Online Shop:* https://mansarafoods.com\n🚚 *Delivery:* Fast delivery across PAN India.`;
+            await sendMessage(phone, storeMsg);
+            return;
+        }
+        if (msg === '3' || msg.includes('customer support')) {
+            contact.is_paused = true;
+            contact.step = 'human_takeover';
+            await contact.save();
+            const agentMsg = `👋 *Connecting you to Customer Support!*\n\nAn agent will join this chat shortly to assist you.\n📞 Direct Line: +91 88388 87064`;
+            await sendMessage(phone, agentMsg);
+            return;
+        }
+        if (msg === '4' || msg.includes('complaint')) {
+            contact.step = 'ticket_entry';
+            await contact.save();
+            const complaintMsg = `🎫 *Raise a Complaint / Ticket*\n\nPlease type a brief description of your issue (e.g. damaged package, missing item, delivery delay):`;
+            await sendMessage(phone, complaintMsg);
+            return;
+        }
+        if (msg === '5' || msg.includes('feedback')) {
+            contact.step = 'feedback_entry';
+            await contact.save();
+            const feedbackMsg = `⭐ *Customer Feedback*\n\nWe value your opinion! Please type your suggestions or experience with Mansara Foods:`;
+            await sendMessage(phone, feedbackMsg);
+            return;
+        }
+        if (msg === '6' || msg.includes('contact')) {
+            const contactUsMsg = `📞 *Contact Us*\n\n🏢 Mansara Foods Pvt Ltd\n📍 Chennai, Tamil Nadu, India\n📞 Phone / WhatsApp: +91 88388 87064\n✉️ Email: support@mansarafoods.com\n🌐 Website: https://mansarafoods.com\n_Working Hours: Mon-Sat (9 AM - 6 PM)_`;
+            await sendMessage(phone, contactUsMsg);
+            return;
+        }
+        if (msg === '7' || msg === 'back' || msg.includes('back')) {
+            await sendMainMenu(phone, contact);
             return;
         }
     }
@@ -528,12 +777,12 @@ async function handleBotReply(phone, messageText, contact) {
 
             const cartMsg = lang === 'en'
                 ? `🛒 Added *1x ${product.name}* to your cart!\nPrice: ₹${product.price}\n\nWhat would you like to do?`
-                : `🛒 *1x ${product.name}* आपकी कार्ट में जोड़ा गया!\nकीमत: ₹${product.price}\n\nआप क्या करना चाहेंगे?`;
+                : `🛒 *1x ${product.name}* உங்கள் கார்ட்டில் சேர்க்கப்பட்டது!\nவிலை: ₹${product.price}\n\nநீங்கள் என்ன செய்ய விரும்புகிறீர்கள்?`;
 
             await sendInteractiveButtons(phone, cartMsg, [
-                { id: "btn_checkout", title: lang === 'en' ? "Checkout 💳" : "चेकआउट 💳" },
-                { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "कार्ट देखें 🛒" },
-                { id: "btn_catalog", title: lang === 'en' ? "Continue Shopping 🛍️" : "खरीदारी जारी रखें 🛍️" }
+                { id: "btn_checkout", title: lang === 'en' ? "Checkout 💳" : "செக்அவுட் 💳" },
+                { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் பார்க்க 🛒" },
+                { id: "btn_catalog", title: lang === 'en' ? "Continue Shopping 🛍️" : "தொடர்ந்து வாங்க 🛍️" }
             ]);
             return;
         }
@@ -549,7 +798,7 @@ async function handleBotReply(phone, messageText, contact) {
             }
             const wishMsg = lang === 'en'
                 ? `❤️ Added *${product.name}* to your Wishlist!`
-                : `❤️ *${product.name}* आपकी विशलिस्ट में जोड़ा गया!`;
+                : `❤️ *${product.name}* உங்கள் விருப்பப் பட்டியலில் சேர்க்கப்பட்டது!`;
             await sendMessage(phone, wishMsg);
             await sendCategoryProducts(phone, product.category, contact);
             return;
@@ -577,8 +826,8 @@ async function handleBotReply(phone, messageText, contact) {
 
         const addressMsg = t.checkout_pay_mode.replace('{address}', contact.address);
         await sendInteractiveButtons(phone, addressMsg, [
-            { id: "pay_online", title: lang === 'en' ? "1 - Pay Online" : "1 - ऑनलाइन भुगतान" },
-            { id: "pay_cod", title: lang === 'en' ? "2 - Cash on Delivery" : "2 - कैश ऑन डिलीवरी" }
+            { id: "pay_online", title: lang === 'en' ? "1 - Pay Online" : "1 - ஆன்லைனில் செலுத்த" },
+            { id: "pay_cod", title: lang === 'en' ? "2 - Cash on Delivery" : "2 - கேஷ் ஆன் டெலிவரி" }
         ]);
         return;
     }
@@ -638,8 +887,8 @@ async function handleBotReply(phone, messageText, contact) {
                     .replace('{points}', earnedPoints);
 
                 await sendInteractiveButtons(phone, successMsg, [
-                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ट्रैक करें 📦" },
-                    { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "मुख्य मेनू 🏠" }
+                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
+                    { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
                 ]);
 
                 // Sync CRM Lead Webhook
@@ -654,8 +903,8 @@ async function handleBotReply(phone, messageText, contact) {
                     .replace('{total}', total);
 
                 await sendInteractiveButtons(phone, successMsg, [
-                    { id: "confirm_payment", title: lang === 'en' ? "Confirm Payment ✅" : "भुगतान की पुष्टि ✅" },
-                    { id: "cancel_pending_order", title: lang === 'en' ? "Cancel Order ❌" : "ऑर्डर रद्द करें ❌" }
+                    { id: "confirm_payment", title: lang === 'en' ? "Confirm Payment ✅" : "கட்டணத்தை உறுதிப்படுத்த ✅" },
+                    { id: "cancel_pending_order", title: lang === 'en' ? "Cancel Order ❌" : "ஆர்டரை ரத்து செய் ❌" }
                 ]);
             }
             return;
@@ -678,8 +927,8 @@ async function handleBotReply(phone, messageText, contact) {
                     .replace('{points}', earnedPoints);
 
                 await sendInteractiveButtons(phone, successMsg, [
-                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ट्रैक करें 📦" },
-                    { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "मुख्य मेनू 🏠" }
+                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
+                    { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
                 ]);
 
                 syncCrmOrder(contact, lastOrder);
@@ -697,7 +946,8 @@ async function handleBotReply(phone, messageText, contact) {
                 contact.step = 'main_menu';
                 await contact.save();
 
-                await sendMessage(phone, lang === 'en' ? "❌ Order cancelled successfully." : "❌ ऑर्डर सफलतापूर्वक रद्द कर दिया गया।");
+                await sendMessage(phone, lang === 'en' ? "❌ Order cancelled successfully." : "❌ ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது.");
+                await sendMainMenu(phone, contact);
                 await sendMainMenu(phone, contact);
             }
             return;
@@ -717,12 +967,12 @@ async function handleBotReply(phone, messageText, contact) {
             contact.appliedCoupon = msg.toUpperCase();
             contact.step = 'main_menu';
             await contact.save();
-            await sendMessage(phone, lang === 'en' ? "✅ Coupon applied! 10% discount added to your checkout total." : "✅ कूपन लागू! चेकआउट पर 10% की छूट जोड़ी गई है।");
+            await sendMessage(phone, lang === 'en' ? "✅ Coupon applied! 10% discount added to your checkout total." : "✅ கியூபொன் பயன்படுத்தப்பட்டது! செக்அவுட்டில் 10% தள்ளுபடி சேர்க்கப்பட்டுள்ளது.");
             await sendCartView(phone, contact);
         } else {
             contact.step = 'main_menu';
             await contact.save();
-            await sendMessage(phone, lang === 'en' ? "❌ Invalid coupon code. Returning to cart." : "❌ अमान्य कूपन कोड। कार्ट में वापस जा रहे हैं।");
+            await sendMessage(phone, lang === 'en' ? "❌ Invalid coupon code. Returning to cart." : "❌ தவறான கியூபொன் குறியீடு. கார்ட்டிற்கு திரும்புகிறது.");
             await sendCartView(phone, contact);
         }
         return;
@@ -733,7 +983,7 @@ async function handleBotReply(phone, messageText, contact) {
         contact.appliedCoupon = "";
         contact.step = 'main_menu';
         await contact.save();
-        await sendMessage(phone, lang === 'en' ? "🗑️ Cart cleared successfully!" : "🗑️ कार्ट सफलतापूर्वक खाली की गई!");
+        await sendMessage(phone, lang === 'en' ? "🗑️ Cart cleared successfully!" : "🗑️ கார்ட் வெற்றிகரமாக காலியாக்கப்பட்டது!");
         await sendMainMenu(phone, contact);
         return;
     }
@@ -741,13 +991,13 @@ async function handleBotReply(phone, messageText, contact) {
     // --- ORDER STATUS & TRACKING MENU ---
     if (contact.step === 'orders_menu') {
         if (msg === '1') {
-            await sendMessage(phone, lang === 'en' ? "📝 Please type your new address or instructions:" : "📝 कृपया अपना नया पता या निर्देश टाइप करें:");
+            await sendMessage(phone, lang === 'en' ? "📝 Please type your new address or instructions:" : "📝 தயவுசெய்து உங்கள் புதிய முகவரி அல்லது குறிப்புகளை டைப் செய்யவும்:");
             contact.step = 'reschedule_entry';
             await contact.save();
             return;
         }
         if (msg === '2') {
-            await sendMessage(phone, lang === 'en' ? "❌ Please type the Order ID you wish to cancel (e.g. ORD-123456):" : "❌ कृपया रद्द करने के लिए ऑर्डर आईडी टाइप करें (जैसे ORD-123456):");
+            await sendMessage(phone, lang === 'en' ? "❌ Please type the Order ID you wish to cancel (e.g. ORD-123456):" : "❌ ரத்து செய்ய விரும்பும் ஆர்டர் ஐடியை டைப் செய்யவும் (எ.கா: ORD-123456):");
             contact.step = 'cancel_entry';
             await contact.save();
             return;
@@ -764,7 +1014,7 @@ async function handleBotReply(phone, messageText, contact) {
         contact.address = messageText;
         contact.step = 'main_menu';
         await contact.save();
-        await sendMessage(phone, lang === 'en' ? "✅ Delivery instruction received and updated in shipping system." : "✅ वितरण निर्देश प्राप्त हुआ और अपडेट कर दिया गया है।");
+        await sendMessage(phone, lang === 'en' ? "✅ Delivery instruction received and updated in shipping system." : "✅ விநியோக குறிப்பு பெறப்பட்டு கணினியில் புதுப்பிக்கப்பட்டது.");
         await sendMainMenu(phone, contact);
         return;
     }
@@ -780,16 +1030,16 @@ async function handleBotReply(phone, messageText, contact) {
                 }
                 contact.step = 'main_menu';
                 await contact.save();
-                await sendMessage(phone, lang === 'en' ? `✅ Order ${orderIdToCancel} has been cancelled.` : `✅ ऑर्डर ${orderIdToCancel} रद्द कर दिया गया है।`);
+                await sendMessage(phone, lang === 'en' ? `✅ Order ${orderIdToCancel} has been cancelled.` : `✅ ஆர்டர் ${orderIdToCancel} ரத்து செய்யப்பட்டது.`);
             } else {
                 contact.step = 'main_menu';
                 await contact.save();
-                await sendMessage(phone, lang === 'en' ? `❌ Cannot cancel order. Status is already ${orderToCancel.status}.` : `❌ ऑर्डर रद्द नहीं किया जा सकता। इसकी स्थिति पहले से ही ${orderToCancel.status} है।`);
+                await sendMessage(phone, lang === 'en' ? `❌ Cannot cancel order. Status is already ${orderToCancel.status}.` : `❌ ஆர்டரை ரத்து செய்ய முடியாது. நிலை ஏற்கனவே ${orderToCancel.status} ஆக உள்ளது.`);
             }
         } else {
             contact.step = 'main_menu';
             await contact.save();
-            await sendMessage(phone, lang === 'en' ? "❌ Order ID not found." : "❌ ऑर्डर आईडी नहीं मिला।");
+            await sendMessage(phone, lang === 'en' ? "❌ Order ID not found." : "❌ ஆர்டர் ஐடி கிடைக்கவில்லை.");
         }
         await sendMainMenu(phone, contact);
         return;
@@ -800,7 +1050,7 @@ async function handleBotReply(phone, messageText, contact) {
         if (msg === '1') {
             const shipMsg = lang === 'en'
                 ? "🚚 *Shipping & Delivery:*\nWe deliver PAN India. Orders in Tamil Nadu are delivered in 2-3 business days. Rest of India takes 4-7 days. Free shipping on orders above ₹500!"
-                : "🚚 *शिपिंग और वितरण:*\nहम पूरे भारत में डिलीवरी करते हैं। तमिलनाडु में डिलीवरी 2-3 दिनों में होती है। शेष भारत में 4-7 दिन लगते हैं। ₹500 से अधिक के ऑर्डर पर मुफ्त शिपिंग!";
+                : "🚚 *ஷிப்பிங் மற்றும் டெலிவரி:*\nநாங்கள் இந்தியா முழுவதும் விநியோகிக்கிறோம். தமிழ்நாட்டில் 2-3 வேலை நாட்களில் டெலிவரி செய்யப்படும். மற்ற மாநிலங்களில் 4-7 நாட்கள் ஆகும். ₹500 க்கு மேல் இலவச ஷிப்பிங்!";
             await sendMessage(phone, shipMsg);
             await sendSupportMenu(phone, contact);
             return;
@@ -808,7 +1058,7 @@ async function handleBotReply(phone, messageText, contact) {
         if (msg === '2') {
             const retMsg = lang === 'en'
                 ? "🔄 *Returns & Refunds:*\nIf you receive a damaged or incorrect food item, report it within 48 hours for a 100% free replacement or refund. We do not accept returns for opened items due to food hygiene."
-                : "🔄 *वापसी और धनवापसी:*\nयदि आपको क्षतिग्रस्त या गलत खाद्य उत्पाद मिलता है, तो मुफ्त प्रतिस्थापन या धनवापसी के लिए 48 घंटों के भीतर रिपोर्ट करें। खाद्य स्वच्छता के कारण हम खुली हुई वस्तुओं की वापसी स्वीकार नहीं करते हैं।";
+                : "🔄 *திரும்பப் பெறுதல் மற்றும் பணத்தைத் திரும்பப் பெறுதல்:*\nசேதமடைந்த பொருள் கிடைத்தால் 48 மணி நேரத்திற்குள் தெரிவிக்கவும். உணவு பாதுகாப்பு காரணமாக திறக்கப்பட்ட பொருட்கள் திரும்பப் பெறப்படாது.";
             await sendMessage(phone, retMsg);
             await sendSupportMenu(phone, contact);
             return;
@@ -816,7 +1066,7 @@ async function handleBotReply(phone, messageText, contact) {
         if (msg === '3') {
             const certMsg = lang === 'en'
                 ? "🌿 *Organic Certifications:*\nAll our products are certified organic under India's National Programme for Organic Production (NPOP) and FSSAI standards. We source directly from sustainable organic farmers."
-                : "🌿 *जैविक प्रमाणन:*\nहमारे सभी उत्पाद भारत के जैविक उत्पादन के लिए राष्ट्रीय कार्यक्रम (NPOP) और FSSAI मानकों के तहत प्रमाणित जैविक हैं। हम सीधे जैविक किसानों से प्राप्त करते हैं।";
+                : "🌿 *இயற்கை சான்றிதழ்:*\nஎங்கள் பொருட்கள் அனைத்தும் NPOP மற்றும் FSSAI தரநிலைகளின்படி சான்றளிக்கப்பட்டவை.";
             await sendMessage(phone, certMsg);
             await sendSupportMenu(phone, contact);
             return;
@@ -824,7 +1074,7 @@ async function handleBotReply(phone, messageText, contact) {
         if (msg === '4') {
             contact.step = 'ticket_entry';
             await contact.save();
-            await sendMessage(phone, lang === 'en' ? "🎫 *Submit a Ticket*\n\nPlease type a description of the problem you are facing (e.g. damaged Cashews packing, delay in delivery, payment issue):" : "🎫 *टिकट दर्ज करें*\n\nकृपया अपनी समस्या का विवरण लिखें (जैसे: काजू की पैकिंग खराब है, डिलीवरी में देरी, पेमेंट की समस्या):");
+            await sendMessage(phone, lang === 'en' ? "🎫 *Submit a Ticket*\n\nPlease type a description of the problem you are facing (e.g. damaged Cashews packing, delay in delivery, payment issue):" : "🎫 *டிக்கெட் சமர்ப்பிக்கவும்*\n\nஉங்கள் சிக்கலை டைப் செய்யவும் (எ.கா. சேதமடைந்த பேக்கிங், டெலிவரி தாமதம், கட்டண பிரச்சனை):");
             return;
         }
         if (msg === '5') {
@@ -834,7 +1084,7 @@ async function handleBotReply(phone, messageText, contact) {
             
             const handoffMsg = lang === 'en'
                 ? `👋 *Connecting you to our support team!*\nAn agent will reply shortly.`
-                : `👋 *आपको हमारी सहायता टीम से जोड़ रहे हैं!*\nएक एजेंट जल्द ही जवाब देगा।`;
+                : `👋 *எங்கள் உதவி குழுவுடன் உங்களை இணைக்கிறோம்!*\nஒரு முகவர் விரைவில் பதிலளிப்பார்.`;
             await sendMessage(phone, handoffMsg);
             return;
         }
@@ -914,35 +1164,12 @@ async function handleBotReply(phone, messageText, contact) {
 }
 
 async function sendMainMenu(phone, contact) {
-    const lang = contact.language || 'en';
-    const t = MESSAGES[lang] || MESSAGES.en;
     contact.step = 'main_menu';
     await contact.save();
 
-    const sections = [
-        {
-            title: lang === 'en' ? "Mansara Foods Menu" : "மன்சரா ஃபுட்ஸ் பட்டி",
-            rows: [
-                { id: "opt_1_products", title: lang === 'en' ? "1️⃣ View Products" : "1️⃣ தயாரிப்புகளைப் பார்க்க", description: "Browse traditional health mixes & podis" },
-                { id: "opt_2_order", title: lang === 'en' ? "2️⃣ Place an Order" : "2️⃣ ஆர்டர் செய்ய", description: "View cart & checkout items" },
-                { id: "opt_3_track", title: lang === 'en' ? "3️⃣ Track My Order" : "3️⃣ ஆர்டரைக் கண்காணிக்க", description: "Check status of your purchases" },
-                { id: "opt_4_dealer", title: lang === 'en' ? "4️⃣ Dealer Registration" : "4️⃣ டீலர் பதிவு", description: "Become a partner / distributor" },
-                { id: "opt_5_bulk", title: lang === 'en' ? "5️⃣ Bulk Orders" : "5️⃣ மொத்த ஆர்டர்கள்", description: "Inquire about wholesale pricing" },
-                { id: "opt_6_offers", title: lang === 'en' ? "6️⃣ Offers & Discounts" : "6️⃣ சலுகைகள் & தள்ளுபடிகள்", description: "Special coupon codes & discounts" },
-                { id: "opt_7_recipes", title: lang === 'en' ? "7️⃣ Recipes" : "7️⃣ சமையல் குறிப்புகள்", description: "Healthy dishes & preparation ideas" },
-                { id: "opt_8_store", title: lang === 'en' ? "8️⃣ Store Locator" : "8️⃣ கடைகள் இருப்பிடம்", description: "Find nearby outlets & shipping info" },
-                { id: "opt_9_support", title: lang === 'en' ? "9️⃣ Customer Support" : "9️⃣ வாடிக்கையாளர் ஆதரவு", description: "FAQs, returns & help center" },
-                { id: "opt_10_sales", title: lang === 'en' ? "🔟 Contact Sales Team" : "🔟 விற்பனை குழு", description: "Speak with a representative" }
-            ]
-        }
-    ];
+    const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nWe're happy to serve you.\n\nPlease choose an option below:\n\n1️⃣ Shop Products\n2️⃣ Orders\n3️⃣ Business (Dealers & Bulk Orders)\n4️⃣ Help & Support`;
 
-    await sendInteractiveList(
-        phone,
-        t.main_menu,
-        lang === 'en' ? "Select Option 📋" : "தேர்வு செய்க 📋",
-        sections
-    );
+    await sendImageMessage(phone, BANNER_IMAGE_URL, welcomeMsg);
 }
 
 async function sendCatalogMenu(phone, contact) {
@@ -1131,11 +1358,11 @@ cron.schedule('*/15 * * * *', async () => {
             const lang = contact.language || 'en';
             const nudgeMsg = lang === 'en'
                 ? `🛒 *Items waiting in your cart!* 👋\n\nHi ${contact.name || 'there'}, we noticed you left some delicious organic products in your cart.\n\nUse code *SAVE10* to get *10% OFF* on your checkout total!\n\nTap below to complete your order.`
-                : `🛒 *आपकी कार्ट में आइटम बचे हैं!* 👋\n\nनमस्ते, हमने देखा कि आपने अपनी कार्ट में कुछ स्वादिष्ट जैविक उत्पाद छोड़े हैं।\n\nचेकआउट पर *10% छूट* पाने के लिए कूपन *SAVE10* का उपयोग करें!\n\nऑर्डर पूरा करने के लिए नीचे टैप करें।`;
+                : `🛒 *உங்கள் கார்ட்டில் பொருட்கள் உள்ளன!* 👋\n\nவணக்கம், உங்கள் கார்ட்டில் சில சுவையான ஆர்கானிக் பொருட்கள் உள்ளதை கவனித்தோம்.\n\nசெக்அவுட்டில் *10% தள்ளுபடி* பெற *SAVE10* கியூபொனை பயன்படுத்தவும்!\n\nஆர்டரை முடிக்க கீழே தட்டவும்.`;
             
             await sendInteractiveButtons(contact.phone, nudgeMsg, [
-                { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "कार्ट देखें 🛒" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "मुख्य मेनू 🏠" }
+                { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் பார்க்க 🛒" },
+                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
             ]);
 
             contact.lead_status = "Cart Nudged";
@@ -1164,7 +1391,7 @@ cron.schedule('0 10 * * *', async () => {
                 const lang = contact.language || 'en';
                 const feedbackMsg = lang === 'en'
                     ? `🌿 *How was your order ${deliveredOrder.orderId}?* ⭐\n\nThank you for shopping with Mansara Foods! We would love to hear your feedback.\n\nRate your experience from 1 (Poor) to 5 (Excellent) by replying with a number.`
-                    : `🌿 *आपका ऑर्डर ${deliveredOrder.orderId} कैसा था?* ⭐\n\nमनसारा फूड्स के साथ खरीदारी करने के लिए धन्यवाद! हम आपकी प्रतिक्रिया जानना चाहेंगे।\n\n1 (खराब) से 5 (उत्कृष्ट) के बीच नंबर लिखकर प्रतिक्रिया दें।`;
+                    : `🌿 *உங்கள் ஆர்டர் ${deliveredOrder.orderId} எவ்வாறு இருந்தது?* ⭐\n\nமன்சரா ஃபுட்ஸில் வாங்கியதற்கு நன்றி! உங்கள் கருத்தை அறிய விரும்புகிறோம்.\n\n1 (சுமார்) முதல் 5 (மிகச் சிறப்பு) வரை மதிப்பிட்டு பதிலளிக்கவும்.`;
                 
                 await sendMessage(contact.phone, feedbackMsg);
                 contact.lead_status = "Feedback Requested";
@@ -1185,11 +1412,11 @@ cron.schedule('0 10 * * *', async () => {
             const lang = contact.language || 'en';
             const reorderMsg = lang === 'en'
                 ? `🌿 *Time to restock?* 🛒\n\nHi ${contact.name || 'there'}, it has been about a month since your last purchase of fresh organic foods from Mansara Foods.\n\nTap below to browse our fresh batch and order again!`
-                : `🌿 *क्या स्टॉक खत्म हो रहा है?* 🛒\n\nनमस्ते, मनसारा फूड्स से आपकी पिछली खरीदारी को लगभग एक महीना हो गया है। दोबारा ऑर्डर करने के लिए नीचे टैप करें!`;
+                : `🌿 *பொருட்கள் மீண்டும் தேவைப்படுகிறதா?* 🛒\n\nவணக்கம், மன்சரா ஃபுட்ஸில் நீங்கள் கடைசியாக வாங்கி ஒரு மாதம் ஆகிறது. மீண்டும் ஆர்டர் செய்ய கீழே தட்டவும்!`;
             
             await sendInteractiveButtons(contact.phone, reorderMsg, [
-                { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "कैटलॉग देखें 📁" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "मुख्य मेनू 🏠" }
+                { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "கடைப் பட்டியல் 📁" },
+                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
             ]);
 
             contact.lead_status = "Reorder Reminded";
