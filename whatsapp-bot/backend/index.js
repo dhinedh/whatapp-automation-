@@ -143,12 +143,25 @@ async function sendImageMessage(to, imageUrl, captionText = "") {
     }
 }
 
-async function sendInteractiveButtons(to, bodyText, buttonsArray) {
+async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = null) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
         reply: { id: btn.id, title: btn.title.substring(0, 20) }
     }));
+
+    const interactiveData = {
+        type: 'button',
+        body: { text: bodyText },
+        action: { buttons }
+    };
+
+    if (imageUrl) {
+        interactiveData.header = {
+            type: 'image',
+            image: { link: imageUrl }
+        };
+    }
 
     try {
         await axios({
@@ -159,11 +172,15 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray) {
                 messaging_product: 'whatsapp',
                 to: to,
                 type: 'interactive',
-                interactive: { type: 'button', body: { text: bodyText }, action: { buttons } }
+                interactive: interactiveData
             }
         });
     } catch (error) {
         console.error("Error sending buttons:", error.response ? error.response.data : error.message);
+        if (imageUrl) {
+            await sendImageMessage(to, imageUrl);
+            await sendInteractiveButtons(to, bodyText, buttonsArray);
+        }
     }
 }
 
@@ -280,7 +297,7 @@ async function handleBotReply(phone, messageText, contact) {
             { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "कैटलॉग देखें 📁" },
             { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "कार्ट देखें 🛒" },
             { id: "btn_support", title: lang === 'en' ? "Support 💬" : "सहायता 💬" }
-        ]);
+        ], BANNER_IMAGE_URL);
         return;
     }
 
@@ -309,7 +326,7 @@ async function handleBotReply(phone, messageText, contact) {
         await sendInteractiveButtons(phone, MESSAGES.en.welcome + "\n\n" + MESSAGES.ta.welcome, [
             { id: "btn_opt_in_yes", title: "Yes, I agree" },
             { id: "btn_opt_in_no", title: "No, Guest Mode" }
-        ]);
+        ], BANNER_IMAGE_URL);
         return;
     }
 
