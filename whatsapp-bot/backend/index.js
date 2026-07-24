@@ -201,7 +201,7 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
     }
 }
 
-async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl = null) {
+async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl = null, headerText = "Mansara Foods") {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
 
     const interactiveData = {
@@ -217,6 +217,11 @@ async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl 
         interactiveData.header = {
             type: 'image',
             image: { link: imageUrl }
+        };
+    } else if (headerText) {
+        interactiveData.header = {
+            type: 'text',
+            text: headerText
         };
     }
 
@@ -1178,16 +1183,16 @@ async function sendMainMenu(phone, contact) {
     contact.step = 'main_menu';
     await contact.save();
 
-    const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
+    const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
     const sections = [
         {
             title: "Main Menu",
             rows: [
-                { id: "opt_1_shop", title: "1️⃣ Shop Products", description: "Browse traditional foods & catalog" },
-                { id: "opt_2_orders", title: "2️⃣ Orders", description: "Track, view history & order status" },
-                { id: "opt_3_business", title: "3️⃣ Business", description: "Dealers, bulk orders & partnership" },
-                { id: "opt_4_support", title: "4️⃣ Help & Support", description: "FAQs, complaints & customer support" }
+                { id: "opt_1_shop", title: "🛍️ Shop Products", description: "Browse traditional foods & catalog" },
+                { id: "opt_2_orders", title: "📋 Orders", description: "Track, view history & order status" },
+                { id: "opt_3_business", title: "💼 Business", description: "Dealers, bulk orders & partnership" },
+                { id: "opt_4_support", title: "🎧 Help & Support", description: "FAQs, complaints & customer support" }
             ]
         }
     ];
@@ -1204,11 +1209,11 @@ async function sendShopProductsMenu(phone, contact) {
         {
             title: "Shop Options",
             rows: [
-                { id: "shop_1_categories", title: "1. View Categories", description: "Pickles, Masala Powders, Ready Mix & Oils" },
-                { id: "shop_2_offers", title: "2. Today's Offers", description: "10% OFF & special combo discounts" },
-                { id: "shop_3_arrivals", title: "3. New Arrivals", description: "Kavuni Mix, Ragi Malt & new items" },
-                { id: "shop_4_recipes", title: "4. Recipes", description: "Healthy traditional recipe ideas" },
-                { id: "shop_5_back", title: "5. Back to Main Menu", description: "Return to main welcome menu" }
+                { id: "shop_1_categories", title: "🥫 View Categories", description: "Pickles, Masala Powders, Ready Mix & Oils" },
+                { id: "shop_2_offers", title: "🏷️ Today's Offers", description: "10% OFF & special combo discounts" },
+                { id: "shop_3_arrivals", title: "✨ New Arrivals", description: "Kavuni Mix, Ragi Malt & new items" },
+                { id: "shop_4_recipes", title: "🍳 Recipes", description: "Healthy traditional recipe ideas" },
+                { id: "shop_5_back", title: "🏠 Back to Main Menu", description: "Return to main welcome menu" }
             ]
         }
     ];
@@ -1225,13 +1230,13 @@ async function sendProductCategoriesMenu(phone, contact) {
         {
             title: "Categories",
             rows: [
-                { id: "cat_pickles", title: "1. Pickles", description: "Lemon, Avakai Mango & Garlic Pickles" },
-                { id: "cat_masala", title: "2. Masala Powders", description: "Sambar, Rasam & Idli Milagai Podi" },
-                { id: "cat_readymix", title: "3. Ready Mix", description: "Ragi Choco Malt & Nutriminix Mix" },
-                { id: "cat_snacks", title: "4. Snacks", description: "Millet Murukku & Ribbon Pakoda" },
-                { id: "cat_oils", title: "5. Oils & Ghee", description: "Cold-Pressed Sesame Oil & Cow Ghee" },
-                { id: "cat_all", title: "6. View All Products", description: "Browse all items in our store" },
-                { id: "cat_back", title: "7. Back", description: "Return to Shop Products menu" }
+                { id: "cat_pickles", title: "🍋 Pickles", description: "Lemon, Avakai Mango & Garlic Pickles" },
+                { id: "cat_masala", title: "🌶️ Masala Powders", description: "Sambar, Rasam & Idli Milagai Podi" },
+                { id: "cat_readymix", title: "🥣 Ready Mix", description: "Ragi Choco Malt & Nutriminix Mix" },
+                { id: "cat_snacks", title: "🥨 Snacks", description: "Millet Murukku & Ribbon Pakoda" },
+                { id: "cat_oils", title: "🧈 Oils & Ghee", description: "Cold-Pressed Sesame Oil & Cow Ghee" },
+                { id: "cat_all", title: "🛍️ View All Products", description: "Browse all items in our store" },
+                { id: "cat_back", title: "🏠 Back", description: "Return to Shop Products menu" }
             ]
         }
     ];
@@ -1278,10 +1283,10 @@ async function sendProductCardView(phone, selectedProd, contact) {
         {
             title: selectedProd.name.slice(0, 24),
             rows: [
-                { id: "prod_action_details", title: "1. View Details", description: "View full product description & benefits" },
-                { id: "prod_action_add", title: "2. Add to Cart", description: "Add item to your shopping cart" },
-                { id: "prod_action_buy", title: "3. Buy Now", description: "Proceed directly to checkout" },
-                { id: "prod_action_back", title: "4. Back", description: "Return to product categories" }
+                { id: "prod_action_details", title: "ℹ️ View Details", description: "View full product description & benefits" },
+                { id: "prod_action_add", title: "🛒 Add to Cart", description: "Add item to your shopping cart" },
+                { id: "prod_action_buy", title: "⚡ Buy Now", description: "Proceed directly to checkout" },
+                { id: "prod_action_back", title: "🏠 Back", description: "Return to product categories" }
             ]
         }
     ];
@@ -1392,12 +1397,12 @@ async function sendOrdersMenu(phone, contact) {
         {
             title: "Orders Options",
             rows: [
-                { id: "orders_1_place", title: "1. Place New Order", description: "Browse store to place a new order" },
-                { id: "orders_2_track", title: "2. Track My Order", description: "Check current shipping status" },
-                { id: "orders_3_reorder", title: "3. Reorder Previous Purchase", description: "Quickly reorder past items" },
-                { id: "orders_4_history", title: "4. Order History", description: "View your past orders" },
-                { id: "orders_5_payment", title: "5. Payment Status", description: "Check order payment details" },
-                { id: "orders_6_back", title: "6. Back", description: "Return to Main Menu" }
+                { id: "orders_1_place", title: "🛒 Place New Order", description: "Browse store to place a new order" },
+                { id: "orders_2_track", title: "🚚 Track My Order", description: "Check current shipping status" },
+                { id: "orders_3_reorder", title: "🔄 Reorder Items", description: "Quickly reorder past items" },
+                { id: "orders_4_history", title: "📜 Order History", description: "View your past orders" },
+                { id: "orders_5_payment", title: "💳 Payment Status", description: "Check order payment details" },
+                { id: "orders_6_back", title: "🏠 Back", description: "Return to Main Menu" }
             ]
         }
     ];
@@ -1414,13 +1419,13 @@ async function sendBusinessMenu(phone, contact) {
         {
             title: "Business Options",
             rows: [
-                { id: "biz_1_dealer", title: "1. Dealer Registration", description: "Become an authorized dealer" },
-                { id: "biz_2_distributor", title: "2. Distributor Registration", description: "Join regional distribution network" },
-                { id: "biz_3_bulk", title: "3. Bulk Order", description: "Corporate gifting & bulk inquiries" },
-                { id: "biz_4_price", title: "4. Request Price List", description: "View wholesale B2B pricing" },
-                { id: "biz_5_partner", title: "5. Become a Partner", description: "Co-branding & export partnerships" },
-                { id: "biz_6_sales", title: "6. Contact Sales Team", description: "Speak directly with sales representative" },
-                { id: "biz_7_back", title: "7. Back", description: "Return to Main Menu" }
+                { id: "biz_1_dealer", title: "🤝 Dealer Registration", description: "Become an authorized dealer" },
+                { id: "biz_2_distributor", title: "🚚 Distributor Network", description: "Join regional distribution network" },
+                { id: "biz_3_bulk", title: "📦 Bulk Order", description: "Corporate gifting & bulk inquiries" },
+                { id: "biz_4_price", title: "📋 Request Price List", description: "View wholesale B2B pricing" },
+                { id: "biz_5_partner", title: "⭐ Become a Partner", description: "Co-branding & export partnerships" },
+                { id: "biz_6_sales", title: "📞 Contact Sales Team", description: "Speak directly with sales representative" },
+                { id: "biz_7_back", title: "🏠 Back", description: "Return to Main Menu" }
             ]
         }
     ];
@@ -1437,13 +1442,13 @@ async function sendSupportMenu(phone, contact) {
         {
             title: "Help & Support",
             rows: [
-                { id: "supp_1_faq", title: "1. FAQs", description: "Shipping, natural quality & payments" },
-                { id: "supp_2_store", title: "2. Store Locator", description: "Experience store & website info" },
-                { id: "supp_3_customer", title: "3. Customer Support", description: "Talk to live customer support agent" },
-                { id: "supp_4_complaint", title: "4. Raise a Complaint", description: "Submit a support ticket" },
-                { id: "supp_5_feedback", title: "5. Feedback", description: "Rate your experience with us" },
-                { id: "supp_6_contact", title: "6. Contact Us", description: "Phone, email & working hours" },
-                { id: "supp_7_back", title: "7. Back", description: "Return to Main Menu" }
+                { id: "supp_1_faq", title: "❓ FAQs", description: "Shipping, natural quality & payments" },
+                { id: "supp_2_store", title: "📍 Store Locator", description: "Experience store & website info" },
+                { id: "supp_3_customer", title: "🎧 Customer Support", description: "Talk to live customer support agent" },
+                { id: "supp_4_complaint", title: "📝 Raise a Complaint", description: "Submit a support ticket" },
+                { id: "supp_5_feedback", title: "⭐ Feedback", description: "Rate your experience with us" },
+                { id: "supp_6_contact", title: "📞 Contact Us", description: "Phone, email & working hours" },
+                { id: "supp_7_back", title: "🏠 Back", description: "Return to Main Menu" }
             ]
         }
     ];
