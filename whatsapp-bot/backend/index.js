@@ -1185,13 +1185,19 @@ async function sendMainMenu(phone, contact) {
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
-    const buttons = [
-        { id: "opt_1_shop", title: "🛍️ Shop Products" },
-        { id: "opt_2_orders", title: "📋 My Orders" },
-        { id: "opt_3_business", title: "💼 Business & Support" }
+    const sections = [
+        {
+            title: "Main Menu",
+            rows: [
+                { id: "opt_1_shop",     title: "🛍️ Shop Products",    description: "Browse & order healthy food products" },
+                { id: "opt_2_orders",   title: "📋 My Orders",         description: "Track, cancel or reorder" },
+                { id: "opt_3_business", title: "💼 Business",          description: "Dealer registration & bulk orders" },
+                { id: "opt_4_support",  title: "🎧 Help & Support",    description: "FAQs, complaints & live agent" }
+            ]
+        }
     ];
 
-    await sendInteractiveButtons(phone, welcomeMsg, buttons, BANNER_IMAGE_URL);
+    await sendInteractiveList(phone, welcomeMsg, "📋 Choose an Option", sections, BANNER_IMAGE_URL, null);
 }
 
 async function sendShopProductsMenu(phone, contact) {
