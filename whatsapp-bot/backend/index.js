@@ -1185,19 +1185,13 @@ async function sendMainMenu(phone, contact) {
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
-    const sections = [
-        {
-            title: "Main Menu",
-            rows: [
-                { id: "opt_1_shop", title: "1️⃣ Shop Products", description: "Browse traditional foods & catalog" },
-                { id: "opt_2_orders", title: "2️⃣ Orders", description: "Track, view history & order status" },
-                { id: "opt_3_business", title: "3️⃣ Business (Dealers & Bulk)", description: "Dealers, bulk orders & partnership" },
-                { id: "opt_4_support", title: "4️⃣ Help & Support", description: "FAQs, complaints & customer support" }
-            ]
-        }
+    const buttons = [
+        { id: "opt_1_shop", title: "🛍️ Shop Products" },
+        { id: "opt_2_orders", title: "📋 My Orders" },
+        { id: "opt_3_business", title: "💼 Business & Support" }
     ];
 
-    await sendInteractiveList(phone, welcomeMsg, "Select Option 📋", sections, BANNER_IMAGE_URL);
+    await sendInteractiveButtons(phone, welcomeMsg, buttons, BANNER_IMAGE_URL);
 }
 
 async function sendShopProductsMenu(phone, contact) {
@@ -1205,20 +1199,13 @@ async function sendShopProductsMenu(phone, contact) {
     await contact.save();
 
     const text = `🛒 *Shop Products*\n\nPlease choose an option below:`;
-    const sections = [
-        {
-            title: "Shop Options",
-            rows: [
-                { id: "shop_1_categories", title: "1. View Product Categories", description: "Pickles, Masala Powders, Ready Mix & Oils" },
-                { id: "shop_2_offers", title: "2. Today's Offers", description: "10% OFF & special combo discounts" },
-                { id: "shop_3_arrivals", title: "3. New Arrivals", description: "Kavuni Mix, Ragi Malt & new items" },
-                { id: "shop_4_recipes", title: "4. Recipes", description: "Healthy traditional recipe ideas" },
-                { id: "shop_5_back", title: "5. Back to Main Menu", description: "Return to main welcome menu" }
-            ]
-        }
+    const buttons = [
+        { id: "shop_1_categories", title: "🥫 Categories" },
+        { id: "shop_2_offers", title: "🏷️ Today's Offers" },
+        { id: "shop_5_back", title: "🏠 Main Menu" }
     ];
 
-    await sendInteractiveList(phone, text, "Shop Options 🛒", sections);
+    await sendInteractiveButtons(phone, text, buttons);
 }
 
 async function sendProductCategoriesMenu(phone, contact) {
@@ -1226,22 +1213,13 @@ async function sendProductCategoriesMenu(phone, contact) {
     await contact.save();
 
     const text = `🥫 *Product Categories*\n\nPlease choose a category below:`;
-    const sections = [
-        {
-            title: "Categories",
-            rows: [
-                { id: "cat_pickles", title: "1. Pickles", description: "Lemon, Avakai Mango & Garlic Pickles" },
-                { id: "cat_masala", title: "2. Masala Powders", description: "Sambar, Rasam & Idli Milagai Podi" },
-                { id: "cat_readymix", title: "3. Ready Mix", description: "Ragi Choco Malt & Nutriminix Mix" },
-                { id: "cat_snacks", title: "4. Snacks", description: "Millet Murukku & Ribbon Pakoda" },
-                { id: "cat_oils", title: "5. Oils & Ghee", description: "Cold-Pressed Sesame Oil & Cow Ghee" },
-                { id: "cat_all", title: "6. View All Products", description: "Browse all items in our store" },
-                { id: "cat_back", title: "7. Back", description: "Return to Shop Products menu" }
-            ]
-        }
+    const buttons = [
+        { id: "cat_all", title: "🛍️ All Products" },
+        { id: "cat_readymix", title: "🥣 Health Mixes" },
+        { id: "cat_masala", title: "🌶️ Masala Powders" }
     ];
 
-    await sendInteractiveList(phone, text, "View Categories 🥫", sections);
+    await sendInteractiveButtons(phone, text, buttons);
 }
 
 async function sendCategoryItemsMenu(phone, category, contact) {
@@ -1279,19 +1257,13 @@ async function sendProductCardView(phone, selectedProd, contact) {
     
     const cardText = `${icon} *${selectedProd.name}*\n\n✅ ${selectedProd.weight}\n✅ ₹${selectedProd.price}\n\nPlease choose an action below:`;
 
-    const sections = [
-        {
-            title: selectedProd.name.slice(0, 24),
-            rows: [
-                { id: "prod_action_details", title: "1. View Details", description: "View full product description & benefits" },
-                { id: "prod_action_add", title: "2. Add to Cart", description: "Add item to your shopping cart" },
-                { id: "prod_action_buy", title: "3. Buy Now", description: "Proceed directly to checkout" },
-                { id: "prod_action_back", title: "4. Back", description: "Return to product categories" }
-            ]
-        }
+    const buttons = [
+        { id: "prod_action_add", title: "🛒 Add to Cart" },
+        { id: "prod_action_buy", title: "⚡ Buy Now" },
+        { id: "prod_action_back", title: "🏠 Back" }
     ];
 
-    await sendInteractiveList(phone, cardText, "Choose Action ⚡", sections);
+    await sendInteractiveButtons(phone, cardText, buttons);
 }
 
 async function sendCatalogMenu(phone, contact) {
@@ -1393,21 +1365,13 @@ async function sendOrdersMenu(phone, contact) {
     await contact.save();
 
     const text = `📦 *Orders*\n\nPlease choose an option below:`;
-    const sections = [
-        {
-            title: "Orders Options",
-            rows: [
-                { id: "orders_1_place", title: "1. Place New Order", description: "Browse store to place a new order" },
-                { id: "orders_2_track", title: "2. Track My Order", description: "Check current shipping status" },
-                { id: "orders_3_reorder", title: "3. Reorder Previous Purchase", description: "Quickly reorder past items" },
-                { id: "orders_4_history", title: "4. Order History", description: "View your past orders" },
-                { id: "orders_5_payment", title: "5. Payment Status", description: "Check order payment details" },
-                { id: "orders_6_back", title: "6. Back", description: "Return to Main Menu" }
-            ]
-        }
+    const buttons = [
+        { id: "orders_2_track", title: "🚚 Track My Order" },
+        { id: "orders_4_history", title: "📜 Order History" },
+        { id: "orders_6_back", title: "🏠 Main Menu" }
     ];
 
-    await sendInteractiveList(phone, text, "Orders Menu 📦", sections);
+    await sendInteractiveButtons(phone, text, buttons);
 }
 
 async function sendBusinessMenu(phone, contact) {
@@ -1438,22 +1402,13 @@ async function sendSupportMenu(phone, contact) {
     await contact.save();
 
     const text = `💬 *Help & Support*\n\nPlease choose an option below:`;
-    const sections = [
-        {
-            title: "Help & Support",
-            rows: [
-                { id: "supp_1_faq", title: "1. FAQs", description: "Shipping, natural quality & payments" },
-                { id: "supp_2_store", title: "2. Store Locator", description: "Experience store & website info" },
-                { id: "supp_3_customer", title: "3. Customer Support", description: "Talk to live customer support agent" },
-                { id: "supp_4_complaint", title: "4. Raise a Complaint", description: "Submit a support ticket" },
-                { id: "supp_5_feedback", title: "5. Feedback", description: "Rate your experience with us" },
-                { id: "supp_6_contact", title: "6. Contact Us", description: "Phone, email & working hours" },
-                { id: "supp_7_back", title: "7. Back", description: "Return to Main Menu" }
-            ]
-        }
+    const buttons = [
+        { id: "supp_3_customer", title: "🎧 Live Support" },
+        { id: "supp_1_faq", title: "❓ FAQs & Store Info" },
+        { id: "supp_7_back", title: "🏠 Main Menu" }
     ];
 
-    await sendInteractiveList(phone, text, "Support Options 💬", sections);
+    await sendInteractiveButtons(phone, text, buttons);
 }
 
 async function sendLoyaltyInfo(phone, contact) {
