@@ -303,7 +303,7 @@ const MESSAGES = {
 
 // --- Chatbot Logic ---
 async function handleBotReply(phone, messageText, contact) {
-    if (contact.is_paused) return; // Human takeover active
+
 
     const msg = messageText.toLowerCase().trim();
     const lang = contact.language || 'en';
