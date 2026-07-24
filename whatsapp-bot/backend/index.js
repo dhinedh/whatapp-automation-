@@ -161,24 +161,21 @@ async function sendImageMessage(to, imageUrl, captionText = "") {
 }
 
 async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = null) {
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        console.error('[sendInteractiveButtons] Missing PHONE_NUMBER_ID or ACCESS_TOKEN');
+        return;
+    }
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
         reply: { id: btn.id, title: btn.title.substring(0, 20) }
     }));
 
+    // Buttons always sent without image header to avoid Meta API size/format rejections
     const interactiveData = {
         type: 'button',
         body: { text: bodyText },
         action: { buttons }
     };
-
-    if (imageUrl) {
-        interactiveData.header = {
-            type: 'image',
-            image: { link: imageUrl }
-        };
-    }
 
     try {
         await axios({
@@ -192,12 +189,10 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
                 interactive: interactiveData
             }
         });
+        console.log(`[sendInteractiveButtons] OK → ${to}`);
     } catch (error) {
-        console.error("Error sending buttons:", error.response ? error.response.data : error.message);
-        if (imageUrl) {
-            await sendImageMessage(to, imageUrl);
-            await sendInteractiveButtons(to, bodyText, buttonsArray);
-        }
+        const detail = error.response ? JSON.stringify(error.response.data) : error.message;
+        console.error(`[sendInteractiveButtons] FAILED → ${to}:`, detail);
     }
 }
 
@@ -1198,17 +1193,23 @@ async function handleBotReply(phone, messageText, contact) {
 async function sendMainMenu(phone, contact) {
     contact.step = 'main_menu';
     await contact.save();
+    console.log(`[sendMainMenu] Sending to ${phone}`);
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
-    // Message 1: Banner image + first 3 buttons (WhatsApp max is 3 per message)
+    // Send banner image first (fire-and-forget — failure won't block buttons)
+    sendImageMessage(phone, BANNER_IMAGE_URL).catch(e =>
+        console.error('[sendMainMenu] Banner image failed (non-blocking):', e.message)
+    );
+
+    // Message 1: 3 option buttons
     await sendInteractiveButtons(phone, welcomeMsg, [
         { id: "opt_1_shop",     title: "🛍️ Shop Products" },
         { id: "opt_2_orders",   title: "📋 My Orders" },
         { id: "opt_3_business", title: "💼 Business" }
-    ], BANNER_IMAGE_URL);
+    ]);
 
-    // Message 2: Help & Support as a separate button below
+    // Message 2: Help & Support button
     await sendInteractiveButtons(phone, "❓ Need help? We're here for you!", [
         { id: "opt_4_support", title: "🎧 Help & Support" }
     ]);
