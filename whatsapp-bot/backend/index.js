@@ -1451,9 +1451,10 @@ async function sendLoyaltyInfo(phone, contact) {
     ]);
 }
 
-// Simulated CRM sync for orders
+// CRM sync for orders — only fires when CRM_LEAD_WEBHOOK env var is set
 function syncCrmOrder(contact, order) {
-    axios.post(process.env.CRM_LEAD_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-lead', {
+    if (!process.env.CRM_LEAD_WEBHOOK) return;
+    axios.post(process.env.CRM_LEAD_WEBHOOK, {
         CustomerName: contact.name || contact.phone,
         WhatsAppNumber: contact.phone,
         OrderId: order.orderId,
@@ -1583,14 +1584,16 @@ app.post('/webhook', async (req, res) => {
             const phone = message.from;
             const name = contactInfo && contactInfo.profile ? contactInfo.profile.name : '';
             
-            // Sync enquiry immediately with CRM
-            axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
-                CustomerName: name || phone,
-                WhatsAppNumber: phone,
-                MessageText: message.type === 'text' ? message.text.body : `Selection: ${messageText}`
-            })
-            .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${phone}`))
-            .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
+            // Sync enquiry with CRM only if webhook URL is configured
+            if (process.env.CRM_ENQUIRY_WEBHOOK) {
+                axios.post(process.env.CRM_ENQUIRY_WEBHOOK, {
+                    CustomerName: name || phone,
+                    WhatsAppNumber: phone,
+                    MessageText: message.type === 'text' ? message.text.body : `Selection: ${messageText}`
+                })
+                .then(() => console.log(`[CRM Enquiry Sync] Message synced for ${phone}`))
+                .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message || JSON.stringify(e)));
+            }
 
             try {
                 let contact = await Contact.findOne({ phone });
