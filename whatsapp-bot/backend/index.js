@@ -314,6 +314,21 @@ async function handleBotReply(phone, messageText, contact) {
     const lang = contact.language || 'en';
     const t = MESSAGES[lang] || MESSAGES.en;
 
+    // Keywords that always restart the bot (even if paused by human takeover)
+    const isRestartKeyword = ['hi', 'hello', 'hey', 'menu', 'main menu', 'restart', 'start', 'btn_menu', 'hi!', '0'].includes(msg) || msg === '0';
+
+    // If bot is paused (human takeover), only allow restart keywords through
+    if (contact.is_paused) {
+        if (isRestartKeyword) {
+            contact.is_paused = false;
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMainMenu(phone, contact);
+        }
+        // All other messages silently dropped while agent is active
+        return;
+    }
+
     // Compliance Check: Opt-out (STOP) / Opt-in (START)
     if (msg === 'stop' || msg === 'unsubscribe') {
         contact.consent = false;
@@ -344,8 +359,8 @@ async function handleBotReply(phone, messageText, contact) {
         await contact.save();
         
         const handoffMsg = lang === 'en' 
-            ? `👋 *Connecting you to our team!*\n\nOur team member will respond shortly.\n\n📞 *Direct Call/WhatsApp:* +91 96000 67611\n_Hours: 9 AM - 6 PM (Mon-Sat)_`
-            : `👋 *எங்கள் குழுவோடு உங்களை இணைக்கிறோம்!*\n\nஎங்கள் குழு உறுப்பினர் விரைவில் பதிலளிப்பார்.\n\n📞 *நேரடி தொடர்பு/வாட்ஸ்அப்:* +91 96000 67611\n_நேரம்: காலை 9 - மாலை 6 (திங்கள்-சனி)_`;
+            ? `👋 *Connecting you to our team!*\n\nOur team member will respond shortly.\n\n📞 *Direct Call/WhatsApp:* +91 96000 67611\n_Hours: 9 AM - 6 PM (Mon-Sat)_\n\n_Send *Hi* anytime to restart the bot._`
+            : `👋 *எங்கள் குழுவோடு உங்களை இணைக்கிறோம்!*\n\nஎங்கள் குழு உறுப்பினர் விரைவில் பதிலளிப்பார்.\n\n📞 *நேரடி தொடர்பு/வாட்ஸ்அப்:* +91 96000 67611\n_நேரம்: காலை 9 - மாலை 6 (திங்கள்-சனி)_\n\n_மீண்டும் தொடங்க *Hi* அனுப்பவும்._`;
         
         await sendMessage(phone, handoffMsg);
         
@@ -410,11 +425,12 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    // Greeting check (hi, hello, hey, start, menu, main menu, etc.)
-    if (['hi', 'hello', 'hey', 'start', 'menu', 'main menu', 'btn_menu', 'hi!'].includes(msg) || msg === '0') {
+    // Greeting check — show main menu
+    if (isRestartKeyword) {
         await sendMainMenu(phone, contact);
         return;
     }
+
 
     // --- 1. MAIN MENU ROUTING (Options 1 to 4) ---
     if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
