@@ -1585,10 +1585,15 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
     res.sendStatus(200);
     const body = req.body;
+
+    console.log('[WEBHOOK] POST received. object:', body.object);
+
     if (body.object === 'whatsapp_business_account' && body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0]) {
         const webhook_event = body.entry[0].changes[0].value;
         const message = webhook_event.messages[0];
         const contactInfo = webhook_event.contacts && webhook_event.contacts[0] ? webhook_event.contacts[0] : null;
+
+        console.log(`[WEBHOOK] Message from: ${message.from}, type: ${message.type}`);
         
         let messageText = '';
         if (message.type === 'text') messageText = message.text.body;
@@ -1596,6 +1601,8 @@ app.post('/webhook', async (req, res) => {
             if (message.interactive.button_reply) messageText = message.interactive.button_reply.id;
             else if (message.interactive.list_reply) messageText = message.interactive.list_reply.id;
         }
+
+        console.log(`[WEBHOOK] messageText: "${messageText}"`);
 
         if (messageText) {
             const phone = message.from;
@@ -1616,8 +1623,10 @@ app.post('/webhook', async (req, res) => {
                 let contact = await Contact.findOne({ phone });
                 const now = new Date();
                 if (!contact) {
+                    console.log(`[WEBHOOK] New contact: ${phone}`);
                     contact = new Contact({ phone, name: name || phone, firstSeen: now, lastSeen: now, messageCount: 1, messages: [{ text: messageText, time: now }] });
                 } else {
+                    console.log(`[WEBHOOK] Existing contact: ${phone}, step: ${contact.step}, is_paused: ${contact.is_paused}`);
                     contact.lastSeen = now;
                     contact.messageCount += 1;
                     if (name) contact.name = name;
@@ -1628,11 +1637,17 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 await contact.save();
+                console.log(`[WEBHOOK] Calling handleBotReply for ${phone}`);
                 await handleBotReply(phone, messageText, contact);
+                console.log(`[WEBHOOK] handleBotReply done for ${phone}`);
             } catch(e) {
                 console.error("DB Error processing webhook:", e);
             }
+        } else {
+            console.log('[WEBHOOK] No messageText — skipping (status update or unsupported type)');
         }
+    } else {
+        console.log('[WEBHOOK] Not a message event — ignored');
     }
 });
 
