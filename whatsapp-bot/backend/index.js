@@ -520,8 +520,8 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
-        if (msg === 'item_back' || msg === `${items.length + 1}` || msg === 'back' || msg.includes('back')) {
-            await sendProductCategoriesMenu(phone, contact);
+        if (msg === 'item_back' || msg === 'shop_5_back' || msg === 'back' || msg.includes('back')) {
+            await sendMainMenu(phone, contact);
             return;
         }
     }
@@ -553,7 +553,7 @@ async function handleBotReply(phone, messageText, contact) {
             await sendInteractiveButtons(phone, addedMsg, [
                 { id: "btn_checkout", title: "Checkout 💳" },
                 { id: "btn_cart", title: "View Cart 🛒" },
-                { id: "cat_back", title: "Back to Categories" }
+                { id: "opt_1_shop", title: "Continue Shopping 🛍️" }
             ]);
             return;
         }
@@ -572,9 +572,9 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
-        // 4. Back
+        // 4. Back → return to full product list
         if (msg === '4' || msg === 'prod_action_back' || msg === 'back' || msg.includes('back')) {
-            await sendProductCategoriesMenu(phone, contact);
+            await sendShopProductsMenu(phone, contact);
             return;
         }
     }
@@ -1199,18 +1199,41 @@ async function sendMainMenu(phone, contact) {
 }
 
 async function sendShopProductsMenu(phone, contact) {
-    contact.step = 'shop_products';
+    contact.step = 'category_items_list';
+    contact.selectedCategory = 'All';
     await contact.save();
 
-    const text = `🛒 *Shop Products*\n\nPlease choose an option below:`;
-    const buttons = [
-        { id: "shop_1_categories", title: "🥫 Categories" },
-        { id: "shop_2_offers", title: "🏷️ Today's Offers" },
-        { id: "shop_5_back", title: "🏠 Main Menu" }
-    ];
+    // Group all products by category
+    const categoryOrder = ['Ready Mix', 'Masala Powders', 'Pickles', 'Snacks', 'Oils & Ghee'];
+    const sections = categoryOrder.map(cat => {
+        const items = PRODUCTS.filter(p => p.category === cat);
+        if (items.length === 0) return null;
+        return {
+            title: cat,
+            rows: items.map(item => ({
+                id: `item_select_${item.id}`,
+                title: item.name.slice(0, 24),
+                description: `${item.weight} – ₹${item.price}`
+            }))
+        };
+    }).filter(Boolean);
 
-    await sendInteractiveButtons(phone, text, buttons);
+    // Back option at the bottom
+    sections.push({
+        title: "Navigation",
+        rows: [
+            { id: "shop_5_back", title: "🏠 Main Menu", description: "Return to main menu" }
+        ]
+    });
+
+    await sendInteractiveList(
+        phone,
+        `🛒 *Shop Products*\n\nBrowse our full range of traditional, healthy food products below:`,
+        "View Products 🛍️",
+        sections
+    );
 }
+
 
 async function sendProductCategoriesMenu(phone, contact) {
     contact.step = 'product_categories';
