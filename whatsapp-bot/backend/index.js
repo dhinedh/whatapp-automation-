@@ -509,7 +509,12 @@ async function handleBotReply(phone, messageText, contact) {
     }
 
     // --- 4. CATEGORY ITEMS SELECTION ---
-    if (contact.step === 'category_items_list' || msg.startsWith('item_select_') || msg === 'item_back') {
+    if (contact.step === 'category_items_list' || msg.startsWith('item_select_') || msg === 'item_back' || msg === 'shop_more_products') {
+        if (msg === 'shop_more_products' || msg.includes('more product')) {
+            await sendMoreProductsMenu(phone, contact);
+            return;
+        }
+
         let items = PRODUCTS;
         if (contact.selectedCategory && contact.selectedCategory !== "All") {
             items = PRODUCTS.filter(p => p.category === contact.selectedCategory);
@@ -1217,36 +1222,68 @@ async function sendMainMenu(phone, contact) {
 
 async function sendShopProductsMenu(phone, contact) {
     contact.step = 'category_items_list';
-    contact.selectedCategory = 'All';
+    contact.selectedCategory = 'Top';
     await contact.save();
 
-    // Group all products by category
-    const categoryOrder = ['Ready Mix', 'Masala Powders', 'Pickles', 'Snacks', 'Oils & Ghee'];
-    const sections = categoryOrder.map(cat => {
-        const items = PRODUCTS.filter(p => p.category === cat);
-        if (items.length === 0) return null;
-        return {
-            title: cat,
-            rows: items.map(item => ({
-                id: `item_select_${item.id}`,
-                title: item.name.slice(0, 24),
-                description: `${item.weight} – ₹${item.price}`
-            }))
-        };
-    }).filter(Boolean);
+    const topProducts = PRODUCTS.slice(0, 8);
+    const topRows = topProducts.map((item, idx) => ({
+        id: `item_select_${item.id}`,
+        title: `${idx + 1}. ${item.name.slice(0, 21)}`,
+        description: `${item.weight} – ₹${item.price}`
+    }));
 
-    // Back option at the bottom
-    sections.push({
-        title: "Navigation",
-        rows: [
-            { id: "shop_5_back", title: "🏠 Main Menu", description: "Return to main menu" }
-        ]
-    });
+    const sections = [
+        {
+            title: "🛒 Top Products",
+            rows: topRows
+        },
+        {
+            title: "More Options",
+            rows: [
+                { id: "shop_more_products", title: "📦 More Products", description: "View remaining products catalog" },
+                { id: "shop_5_back", title: "🏠 Main Menu", description: "Return to main menu" }
+            ]
+        }
+    ];
 
     await sendInteractiveList(
         phone,
-        `🛒 *Shop Products*\n\nBrowse our full range of traditional, healthy food products below:`,
+        `🛒 *Shop Products*\n\nBrowse our top products below:`,
         "View Products 🛍️",
+        sections
+    );
+}
+
+async function sendMoreProductsMenu(phone, contact) {
+    contact.step = 'category_items_list';
+    contact.selectedCategory = 'More';
+    await contact.save();
+
+    const remainingProducts = PRODUCTS.slice(8);
+    const remainingRows = remainingProducts.map((item, idx) => ({
+        id: `item_select_${item.id}`,
+        title: `${idx + 9}. ${item.name.slice(0, 20)}`,
+        description: `${item.weight} – ₹${item.price}`
+    }));
+
+    const sections = [
+        {
+            title: "📦 More Products",
+            rows: remainingRows
+        },
+        {
+            title: "Navigation",
+            rows: [
+                { id: "opt_1_shop", title: "⬅️ Top Products", description: "Return to top products" },
+                { id: "shop_5_back", title: "🏠 Main Menu", description: "Return to main menu" }
+            ]
+        }
+    ];
+
+    await sendInteractiveList(
+        phone,
+        `📦 *More Products*\n\nHere are more of our traditional products:`,
+        "More Products 🛍️",
         sections
     );
 }
