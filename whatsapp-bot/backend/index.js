@@ -1463,14 +1463,41 @@ async function sendOrdersMenu(phone, contact) {
     contact.step = 'orders_menu';
     await contact.save();
 
-    const text = `📦 *Orders*\n\nPlease choose an option below:`;
-    const buttons = [
-        { id: "orders_2_track", title: "🚚 Track My Order" },
-        { id: "orders_4_history", title: "📜 Order History" },
-        { id: "orders_6_back", title: "🏠 Main Menu" }
-    ];
+    if (contact.orders && contact.orders.length > 0) {
+        const latestOrder = contact.orders[contact.orders.length - 1];
+        const dateStr = latestOrder.createdAt 
+            ? new Date(latestOrder.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : 'Recent';
 
-    await sendInteractiveButtons(phone, text, buttons);
+        let itemsSummary = '';
+        if (latestOrder.items && latestOrder.items.length > 0) {
+            itemsSummary = latestOrder.items.map(i => `• *${i.name}* (x${i.quantity}) - ₹${i.price * i.quantity}`).join('\n');
+        } else {
+            itemsSummary = '• Item details in order invoice';
+        }
+
+        const trackingInfo = latestOrder.trackingLink 
+            ? `\n🔗 *Tracking:* ${latestOrder.trackingLink}` 
+            : `\n🚚 *Tracking ID:* ${latestOrder.orderId}`;
+
+        const text = `📦 *My Orders*\n\n🔹 *Your Current Order Details:*\n🆔 *Order ID:* ${latestOrder.orderId}\n📅 *Date:* ${dateStr}\n📊 *Status:* *${latestOrder.status}* (${latestOrder.paymentStatus})\n\n🛒 *Items Purchased:*\n${itemsSummary}\n\n💰 *Total Amount:* ₹${latestOrder.total}${trackingInfo}\n\nSelect an option below:`;
+
+        const buttons = [
+            { id: "orders_2_track", title: "🚚 Track Order" },
+            { id: "orders_4_history", title: "📜 Order History" },
+            { id: "orders_6_back", title: "🏠 Main Menu" }
+        ];
+
+        await sendInteractiveButtons(phone, text, buttons);
+    } else {
+        const text = `📦 *My Orders*\n\nℹ️ You haven't placed any orders yet.\n\nBrowse our authentic traditional products to place your first order!`;
+        const buttons = [
+            { id: "opt_1_shop", title: "🛍️ Shop Products" },
+            { id: "orders_6_back", title: "🏠 Main Menu" }
+        ];
+
+        await sendInteractiveButtons(phone, text, buttons);
+    }
 }
 
 async function sendBusinessMenu(phone, contact) {
