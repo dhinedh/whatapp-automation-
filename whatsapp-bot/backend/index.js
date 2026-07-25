@@ -438,7 +438,7 @@ async function handleBotReply(phone, messageText, contact) {
     if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
         // Option 1: Shop Products
         if (msg === '1' || msg === '1️⃣' || msg.includes('shop') || msg === 'opt_1_shop' || msg === 'opt_1_products') {
-            await sendShopProductsMenu(phone, contact);
+            await sendProductCategoriesMenu(phone, contact);
             return;
         }
         // Option 2: Orders
@@ -509,8 +509,8 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
-        if (msg === '7' || msg === 'cat_back' || msg === 'back') {
-            await sendShopProductsMenu(phone, contact);
+        if (msg === '7' || msg === 'cat_back' || msg === 'back' || msg.includes('main menu')) {
+            await sendMainMenu(phone, contact);
             return;
         }
     }
@@ -544,7 +544,7 @@ async function handleBotReply(phone, messageText, contact) {
         }
 
         if (msg === 'item_back' || msg === 'shop_5_back' || msg === 'back' || msg.includes('back')) {
-            await sendMainMenu(phone, contact);
+            await sendProductCategoriesMenu(phone, contact);
             return;
         }
     }
@@ -1300,14 +1300,32 @@ async function sendProductCategoriesMenu(phone, contact) {
     contact.step = 'product_categories';
     await contact.save();
 
-    const text = `🥫 *Product Categories*\n\nPlease choose a category below:`;
-    const buttons = [
-        { id: "cat_all", title: "🛍️ All Products" },
-        { id: "cat_readymix", title: "🥣 Health Mixes" },
-        { id: "cat_masala", title: "🌶️ Masala Powders" }
+    const sections = [
+        {
+            title: "📁 Product Categories",
+            rows: [
+                { id: "cat_pickles", title: "🥒 Pickles", description: "Lemon, Mango & Garlic Pickles" },
+                { id: "cat_masala", title: "🌶️ Masala Powders", description: "Sambar, Rasam & Idli Podi" },
+                { id: "cat_readymix", title: "🥣 Health Mixes", description: "Ragi Choco, Nutriminix & Kavuni" },
+                { id: "cat_snacks", title: "🥨 Snacks", description: "Millet Murukku & Ribbon Pakoda" },
+                { id: "cat_oils", title: "🧈 Oils & Ghee", description: "Cold-Pressed Sesame Oil & Cow Ghee" },
+                { id: "cat_all", title: "🛍️ All Products", description: "Browse complete catalog" }
+            ]
+        },
+        {
+            title: "Navigation",
+            rows: [
+                { id: "cat_back", title: "🏠 Main Menu", description: "Return to main menu" }
+            ]
+        }
     ];
 
-    await sendInteractiveButtons(phone, text, buttons);
+    await sendInteractiveList(
+        phone,
+        `🥫 *Mansara Product Categories*\n\nPlease choose a category below to browse products:`,
+        "Select Category 📁",
+        sections
+    );
 }
 
 async function sendCategoryItemsMenu(phone, category, contact) {
