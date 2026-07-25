@@ -165,12 +165,19 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
         console.error('[sendInteractiveButtons] Missing PHONE_NUMBER_ID or ACCESS_TOKEN');
         return;
     }
+
+    if (imageUrl) {
+        await sendImageMessage(to, imageUrl).catch(e =>
+            console.error('[sendInteractiveButtons] Header image failed:', e.message)
+        );
+    }
+
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
         reply: { id: btn.id, title: btn.title.substring(0, 20) }
     }));
 
-    // Buttons always sent without image header to avoid Meta API size/format rejections
+    // Buttons sent without image header object to avoid Meta API size/format rejections; image is sent first above
     const interactiveData = {
         type: 'button',
         body: { text: bodyText },
@@ -1202,8 +1209,8 @@ async function sendMainMenu(phone, contact) {
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
-    // Send banner image first (fire-and-forget — failure won't block buttons)
-    sendImageMessage(phone, BANNER_IMAGE_URL).catch(e =>
+    // Send banner image first and await so it is processed by WhatsApp before the interactive buttons
+    await sendImageMessage(phone, BANNER_IMAGE_URL).catch(e =>
         console.error('[sendMainMenu] Banner image failed (non-blocking):', e.message)
     );
 
