@@ -98,28 +98,25 @@ const Contact = mongoose.model('Contact', contactSchema);
 
 // --- Mansara Foods Products Database (mansarafoods.com) ---
 const PRODUCTS = [
-    // Pickles
-    { id: "prod_lemon_pickle", name: "Lemon Pickle", category: "Pickles", weight: "500g", price: 180, stock: 100, description: "Authentic homestyle Lemon Pickle prepared with handpicked fresh lemons, cold-pressed sesame oil, and traditional spices." },
-    { id: "prod_mango_pickle", name: "Avakai Mango Pickle", category: "Pickles", weight: "500g", price: 190, stock: 80, description: "Traditional spicy raw mango pickle made using secret family recipe." },
-    { id: "prod_garlic_pickle", name: "Poondu Garlic Pickle", category: "Pickles", weight: "250g", price: 160, stock: 60, description: "Rich and flavorful garlic pickle crafted with roasted garlic cloves and natural spices." },
+    // Health Mixes & Porridge
+    { id: "prod_ragi_choco", name: "Ragi Choco Malt", category: "Health Mixes", weight: "250g", price: 250, stock: 100, description: "Nutritious health drink mix combining pure Ragi (finger millet) with premium cocoa." },
+    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Mix", category: "Health Mixes", weight: "250g", price: 200, stock: 100, description: "Traditional 27-ingredient health mix with Kavuni black rice, samba wheat, barley & millets." },
+    { id: "prod_urad_classic", name: "Urad Porridge Mix - Classic", category: "Health Mixes", weight: "250g", price: 180, stock: 90, description: "Traditional wholesome black gram porridge mix for everyday strength." },
+    { id: "prod_urad_premium", name: "Urad Porridge Mix - Premium", category: "Health Mixes", weight: "250g", price: 210, stock: 80, description: "Blend of black gram, ragi, and heritage rice varieties." },
+    { id: "prod_urad_salt_pepper", name: "Urad Mix - Salt n Pepper", category: "Health Mixes", weight: "250g", price: 180, stock: 85, description: "Savoury health mix variant crafted with cumin and black pepper." },
+    { id: "prod_urad_millet", name: "Urad Mix - Millet Magic", category: "Health Mixes", weight: "250g", price: 190, stock: 90, description: "Wholesome blend of black gram with nutrient-dense millets." },
+    { id: "prod_kavuni_mix", name: "Black Rice Delight (Kavuni)", category: "Health Mixes", weight: "250g", price: 220, stock: 90, description: "Royal Kavuni black rice porridge mix loaded with natural antioxidants." },
 
-    // Masala Powders
-    { id: "prod_sambar_powder", name: "Grandma Sambar Powder", category: "Masala Powders", weight: "250g", price: 140, stock: 120, description: "Aromatic South Indian sambar powder freshly ground from handpicked spices." },
-    { id: "prod_rasam_powder", name: "Pepper Cumin Rasam Powder", category: "Masala Powders", weight: "250g", price: 140, stock: 100, description: "Authentic rasam powder rich in black pepper, cumin, and coriander." },
-    { id: "prod_idli_podi", name: "Gunpowder Idli Milagai Podi", category: "Masala Powders", weight: "200g", price: 110, stock: 150, description: "Spicy roasted dal and red chili powder for idlis and dosas." },
+    // Rice Podi Mixes
+    { id: "prod_idli_podi", name: "Traditional Idly Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 150, description: "Millet-fusion style spicy roasted dal & red chili podi for idly & dosa." },
+    { id: "prod_paruppu_podi", name: "Homestyle Paruppu Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 120, description: "Protein-rich lentil rice powder delicious with hot rice & ghee." },
+    { id: "prod_curry_leaf_podi", name: "Curry Leaves Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 100, description: "Traditional Karuveppilai rice podi rich in iron and vitamins." },
+    { id: "prod_coriander_podi", name: "Coriander Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 100, description: "Fragrant roasted coriander & lentil powder mix for rice." },
+    { id: "prod_moringa_podi", name: "Moringa Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 110, description: "Superfood Moringa leaf rice mix packed with essential nutrients." },
+    { id: "prod_pirandai_podi", name: "Pirandai Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 95, description: "Medicinal Veldt Grape (Pirandai) rice mix supporting digestion." },
 
-    // Ready Mix
-    { id: "prod_ragi_choco", name: "Ragi Choco Malt", category: "Ready Mix", weight: "250g", price: 250, stock: 80, description: "Nutritious health drink mix combining pure Ragi (finger millet) with rich cocoa." },
-    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Health Mix", category: "Ready Mix", weight: "250g", price: 200, stock: 100, description: "Traditional health mix with Kavuni black rice, samba wheat, barley & millets." },
-    { id: "prod_kavuni_mix", name: "Kavuni Black Rice Porridge Mix", category: "Ready Mix", weight: "250g", price: 220, stock: 90, description: "Royal Kavuni black rice porridge mix loaded with antioxidants and vitamins." },
-
-    // Snacks
-    { id: "prod_millet_murukku", name: "Crispy Millet Murukku", category: "Snacks", weight: "200g", price: 120, stock: 90, description: "Crunchy tea-time snack made with organic millets and cold-pressed oil." },
-    { id: "prod_ribbon_pakoda", name: "Traditional Ribbon Pakoda", category: "Snacks", weight: "200g", price: 110, stock: 85, description: "Homestyle ribbon pakoda savory prepared with gram flour and butter." },
-
-    // Oils & Ghee
-    { id: "prod_sesame_oil", name: "Cold-Pressed Chekku Sesame Oil", category: "Oils & Ghee", weight: "1L", price: 420, stock: 50, description: "100% pure cold-pressed sesame oil extracted using traditional wooden chekku." },
-    { id: "prod_cow_ghee", name: "Pure Desi Cow Ghee", category: "Oils & Ghee", weight: "500ml", price: 480, stock: 40, description: "Aromatic Bilona method pure desi cow ghee made from fresh milk." }
+    // Combos & Value Packs
+    { id: "prod_wellness_combo", name: "Ultimate Wellness Combo", category: "Combos & Packs", weight: "5 Mixes Pack", price: 330, stock: 50, description: "Special value combo featuring 5 signature porridge blends." }
 ];
 
 // --- Send Message Functions ---
@@ -497,19 +494,17 @@ async function handleBotReply(phone, messageText, contact) {
     // --- 3. PRODUCT CATEGORIES FLOW ---
     if (contact.step === 'product_categories' || msg.startsWith('cat_')) {
         let catName = "";
-        if (msg === '1' || msg === 'cat_pickles' || msg.includes('pickle')) catName = "Pickles";
-        else if (msg === '2' || msg === 'cat_masala' || msg.includes('masala')) catName = "Masala Powders";
-        else if (msg === '3' || msg === 'cat_readymix' || msg.includes('ready')) catName = "Ready Mix";
-        else if (msg === '4' || msg === 'cat_snacks' || msg.includes('snack')) catName = "Snacks";
-        else if (msg === '5' || msg === 'cat_oils' || msg.includes('oil') || msg.includes('ghee')) catName = "Oils & Ghee";
-        else if (msg === '6' || msg === 'cat_all' || msg.includes('all')) catName = "All";
+        if (msg === '1' || msg === 'cat_readymix' || msg.includes('health') || msg.includes('porridge')) catName = "Health Mixes";
+        else if (msg === '2' || msg === 'cat_podi' || msg.includes('podi') || msg.includes('rice')) catName = "Rice Podi Mixes";
+        else if (msg === '3' || msg === 'cat_combos' || msg.includes('combo') || msg.includes('wellness')) catName = "Combos & Packs";
+        else if (msg === '4' || msg === 'cat_all' || msg.includes('all')) catName = "All";
 
         if (catName) {
             await sendCategoryItemsMenu(phone, catName, contact);
             return;
         }
 
-        if (msg === '7' || msg === 'cat_back' || msg === 'back' || msg.includes('main menu')) {
+        if (msg === '5' || msg === 'cat_back' || msg === 'back' || msg.includes('main menu')) {
             await sendMainMenu(phone, contact);
             return;
         }
@@ -1304,11 +1299,9 @@ async function sendProductCategoriesMenu(phone, contact) {
         {
             title: "📁 Product Categories",
             rows: [
-                { id: "cat_pickles", title: "🥒 Pickles", description: "Lemon, Mango & Garlic Pickles" },
-                { id: "cat_masala", title: "🌶️ Masala Powders", description: "Sambar, Rasam & Idli Podi" },
-                { id: "cat_readymix", title: "🥣 Health Mixes", description: "Ragi Choco, Nutriminix & Kavuni" },
-                { id: "cat_snacks", title: "🥨 Snacks", description: "Millet Murukku & Ribbon Pakoda" },
-                { id: "cat_oils", title: "🧈 Oils & Ghee", description: "Cold-Pressed Sesame Oil & Cow Ghee" },
+                { id: "cat_readymix", title: "🥣 Health Mixes & Porridge", description: "Ragi Choco, Nutriminix & Urad Porridge" },
+                { id: "cat_podi", title: "🌾 Rice Podi Mixes", description: "Idly Podi, Paruppu, Curry Leaves & Moringa Podi" },
+                { id: "cat_combos", title: "🎁 Combos & Packs", description: "Ultimate Wellness Combo (5 Mixes)" },
                 { id: "cat_all", title: "🛍️ All Products", description: "Browse complete catalog" }
             ]
         },
