@@ -119,6 +119,13 @@ const PRODUCTS = [
     { id: "prod_wellness_combo", name: "Ultimate Wellness Combo", category: "Combos & Packs", weight: "5 Mixes Pack", price: 330, stock: 50, description: "Special value combo featuring 5 signature porridge blends." }
 ];
 
+// --- Helper to check target number 7904441760 ---
+function isTargetNumber(phone) {
+    if (!phone) return false;
+    const cleanPhone = phone.toString().replace(/\D/g, '');
+    return cleanPhone.endsWith('7904441760');
+}
+
 // --- Send Message Functions ---
 async function sendMessage(to, text) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
@@ -308,6 +315,13 @@ const MESSAGES = {
 // --- Chatbot Logic ---
 async function handleBotReply(phone, messageText, contact) {
 
+    // Target number 7904441760 special rule: if not paused, auto-consent and allow multi-use & multi-sending
+    if (isTargetNumber(phone) && !contact.is_paused) {
+        if (contact.consent !== true) {
+            contact.consent = true;
+            contact.consentDate = new Date();
+        }
+    }
 
     const msg = messageText.toLowerCase().trim();
     const lang = contact.language || 'en';
@@ -1704,15 +1718,27 @@ app.post('/webhook', async (req, res) => {
             try {
                 let contact = await Contact.findOne({ phone });
                 const now = new Date();
+                const isTarget = isTargetNumber(phone);
                 if (!contact) {
                     console.log(`[WEBHOOK] New contact: ${phone}`);
-                    contact = new Contact({ phone, name: name || phone, firstSeen: now, lastSeen: now, messageCount: 1, messages: [{ text: messageText, time: now }] });
+                    contact = new Contact({ 
+                        phone, 
+                        name: name || phone, 
+                        firstSeen: now, 
+                        lastSeen: now, 
+                        messageCount: 1, 
+                        messages: [{ text: messageText, time: now }],
+                        consent: isTarget ? true : null
+                    });
                 } else {
                     console.log(`[WEBHOOK] Existing contact: ${phone}, step: ${contact.step}, is_paused: ${contact.is_paused}`);
                     contact.lastSeen = now;
                     contact.messageCount += 1;
                     if (name) contact.name = name;
                     contact.messages.push({ text: messageText, time: now });
+                    if (isTarget && !contact.is_paused) {
+                        contact.consent = true;
+                    }
                     // Reset cart recovery nudge status on user activity
                     if (contact.lead_status === "Cart Nudged") {
                         contact.lead_status = "Active";
