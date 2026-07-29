@@ -230,12 +230,22 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
 async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl = null, headerText = "Mansara Foods") {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
 
+    // Sanitize sections & rows to strictly enforce Meta Graph API length limits (Max 24 chars for titles)
+    const sanitizedSections = (sections || []).map(sec => ({
+        title: (sec.title || '').substring(0, 24),
+        rows: (sec.rows || []).map(row => ({
+            id: row.id,
+            title: (row.title || '').substring(0, 24),
+            ...(row.description ? { description: row.description.substring(0, 72) } : {})
+        }))
+    }));
+
     const interactiveData = {
         type: 'list',
         body: { text: bodyText },
         action: {
             button: buttonText.substring(0, 20),
-            sections: sections
+            sections: sanitizedSections
         }
     };
 
@@ -1331,7 +1341,7 @@ async function sendProductCategoriesMenu(phone, contact) {
         {
             title: "📁 Product Categories",
             rows: [
-                { id: "cat_readymix", title: "🥣 Health Mixes & Porridge", description: "Ragi Choco, Nutriminix & Urad Porridge" },
+                { id: "cat_readymix", title: "🥣 Health Mixes", description: "Ragi Choco, Nutriminix & Urad Porridge" },
                 { id: "cat_podi", title: "🌾 Rice Podi Mixes", description: "Idly Podi, Paruppu, Curry Leaves & Moringa Podi" },
                 { id: "cat_combos", title: "🎁 Combos & Packs", description: "Ultimate Wellness Combo (5 Mixes)" },
                 { id: "cat_all", title: "🛍️ All Products", description: "Browse complete catalog" }
@@ -1365,7 +1375,7 @@ async function sendCategoryItemsMenu(phone, category, contact) {
 
     const rows = items.map((item, idx) => ({
         id: `item_select_${item.id}`,
-        title: `${idx + 1}. ${item.name.slice(0, 20)}`,
+        title: `${idx + 1}. ${item.name.slice(0, 18)}`.substring(0, 24),
         description: `${item.weight} - ₹${item.price}`
     }));
 
@@ -1375,7 +1385,7 @@ async function sendCategoryItemsMenu(phone, category, contact) {
         description: "Return to Categories"
     });
 
-    const sections = [{ title: category === "All" ? "All Products" : category, rows }];
+    const sections = [{ title: (category === "All" ? "All Products" : category).substring(0, 24), rows }];
     await sendInteractiveList(phone, `🥫 *${category === "All" ? "All Products" : category}*\n\nPlease select a product below:`, "Select Product 🛍️", sections);
 }
 
@@ -1405,15 +1415,15 @@ async function sendCatalogMenu(phone, contact) {
 
     const sections = [
         {
-            title: lang === 'en' ? "Product Categories" : "தயாரிப்பு வகைகள்",
+            title: (lang === 'en' ? "Product Categories" : "தயாரிப்பு வகைகள்").substring(0, 24),
             rows: [
-                { id: "cat_health_mixes", title: lang === 'en' ? "🥣 Health Mixes & Porridge" : "🥣 சத்து மாவுகள் & கஞ்சி", description: "Ragi Choco Malt, Nutriminix multigrain mix" },
+                { id: "cat_health_mixes", title: lang === 'en' ? "🥣 Health Mixes" : "🥣 சத்து மாவுகள்", description: "Ragi Choco Malt, Nutriminix multigrain mix" },
                 { id: "cat_rice_podi", title: lang === 'en' ? "🌾 Rice Mixes & Podi" : "🌾 சாதப் பொடிகள்", description: "Paruppu, Pirandai, Curry Leaves & Coriander Podi" },
                 { id: "cat_combos", title: lang === 'en' ? "🎁 Combos & Packs" : "🎁 சிறப்பு பேக்குகள்", description: "5-Flavor traditional rice mix podi combo pack" }
             ]
         },
         {
-            title: lang === 'en' ? "Actions" : "செயல்கள்",
+            title: (lang === 'en' ? "Actions" : "செயல்கள்").substring(0, 24),
             rows: [
                 { id: "btn_menu", title: lang === 'en' ? "🏠 Main Menu" : "🏠 முதன்மை பட்டி" }
             ]
