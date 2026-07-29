@@ -171,23 +171,23 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
         return;
     }
 
-    if (imageUrl) {
-        await sendImageMessage(to, imageUrl).catch(e =>
-            console.error('[sendInteractiveButtons] Header image failed:', e.message)
-        );
-    }
-
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
         reply: { id: btn.id, title: btn.title.substring(0, 20) }
     }));
 
-    // Buttons sent without image header object to avoid Meta API size/format rejections; image is sent first above
     const interactiveData = {
         type: 'button',
         body: { text: bodyText },
         action: { buttons }
     };
+
+    if (imageUrl) {
+        interactiveData.header = {
+            type: 'image',
+            image: { link: imageUrl }
+        };
+    }
 
     try {
         await axios({
@@ -201,10 +201,29 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
                 interactive: interactiveData
             }
         });
-        console.log(`[sendInteractiveButtons] OK → ${to}`);
+        console.log(`[sendInteractiveButtons] OK (with header image: ${!!imageUrl}) → ${to}`);
     } catch (error) {
         const detail = error.response ? JSON.stringify(error.response.data) : error.message;
         console.error(`[sendInteractiveButtons] FAILED → ${to}:`, detail);
+
+        // Fallback: If header image inside interactive message fails, send image first separately, wait 1200ms, then send buttons
+        if (imageUrl) {
+            console.log(`[sendInteractiveButtons] Attempting fallback: image first then text buttons...`);
+            await sendImageMessage(to, imageUrl).catch(e => console.error('[Fallback image error]:', e.message));
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            delete interactiveData.header;
+            await axios({
+                method: 'POST',
+                url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+                headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+                data: {
+                    messaging_product: 'whatsapp',
+                    to: to,
+                    type: 'interactive',
+                    interactive: interactiveData
+                }
+            }).catch(e => console.error('[Fallback text error]:', e.message));
+        }
     }
 }
 
@@ -1219,19 +1238,17 @@ async function sendMainMenu(phone, contact) {
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
-    // Send banner image first and await so it is processed by WhatsApp before the interactive buttons
-    await sendImageMessage(phone, BANNER_IMAGE_URL).catch(e =>
-        console.error('[sendMainMenu] Banner image failed (non-blocking):', e.message)
-    );
-
-    // Message 1: 3 option buttons
+    // Send Main Welcome Card with Banner Image at the VERY TOP of the card
     await sendInteractiveButtons(phone, welcomeMsg, [
         { id: "opt_1_shop",     title: "🛍️ Shop Products" },
         { id: "opt_2_orders",   title: "📋 My Orders" },
         { id: "opt_3_business", title: "💼 Business" }
-    ]);
+    ], BANNER_IMAGE_URL);
 
-    // Message 2: Help & Support button
+    // Pause 800ms to preserve message order
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Secondary Help & Support Button below main menu
     await sendInteractiveButtons(phone, "❓ Need help? We're here for you!", [
         { id: "opt_4_support", title: "🎧 Help & Support" }
     ]);
