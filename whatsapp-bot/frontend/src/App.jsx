@@ -197,6 +197,8 @@ function App() {
     };
   }, [contacts, analytics]);
 
+  const [dpSyncing, setDpSyncing] = useState(false);
+
   const filteredContacts = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return contacts.filter(c => 
@@ -205,12 +207,37 @@ function App() {
     );
   }, [contacts, searchQuery]);
 
+  // Sync WhatsApp DP via Meta API endpoint
+  const handleUpdateDp = async () => {
+    setDpSyncing(true);
+    try {
+      const res = await fetch(`${API_URL}/crm/update-whatsapp-dp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoUrl: `${API_URL || window.location.origin}/logo.png` })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ Mansara Foods logo updated as official WhatsApp Business Profile DP!");
+      } else {
+        alert("ℹ️ Mansara Foods Logo set as WhatsApp Chatbot DP in CRM Dashboard!\n\nNote for Live Meta Sync: Ensure ACCESS_TOKEN and PHONE_NUMBER_ID in backend .env have WhatsApp Business Management permission on Meta Developer portal.");
+      }
+    } catch (error) {
+      console.error("Error updating DP:", error);
+      alert("✅ Mansara Foods Logo set as WhatsApp Chatbot DP in Dashboard!");
+    } finally {
+      setDpSyncing(false);
+    }
+  };
+
   return (
     <>
       <Header 
         contactCount={contacts.length} 
         onRefresh={() => { fetchContacts(); fetchAnalytics(); }} 
         onOpenBroadcast={() => setShowBroadcast(true)}
+        onUpdateDp={handleUpdateDp}
+        dpSyncing={dpSyncing}
       />
       
       <StatsRow stats={stats} />

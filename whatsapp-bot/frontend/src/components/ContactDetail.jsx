@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { formatDate, formatTime, formatLastSeen } from '../utils/formatters';
+import logoImg from '../assets/logo.png';
 
 function ContactDetail({ contact, onDelete, onToggleBot, onResolveTicket, onUpdateOrderStatus, loading }) {
   const [activeTab, setActiveTab] = useState('chat');
@@ -26,7 +27,7 @@ function ContactDetail({ contact, onDelete, onToggleBot, onResolveTicket, onUpda
   if (!contact) {
     return (
       <div className="flex-1 bg-gray-50 rounded-xl flex flex-col items-center justify-center border border-gray-100 h-[600px] md:h-auto text-gray-400 text-center p-6 z-10">
-        <div className="text-6xl mb-4 animate-bounce">🌿</div>
+        <img src={logoImg} alt="Mansara Foods Logo" className="w-20 h-20 mb-4 rounded-full bg-white object-contain p-2 shadow-md animate-pulse" />
         <h2 className="text-xl font-bold mb-2 text-gray-700">No Customer Selected</h2>
         <p className="text-sm max-w-xs text-gray-400">Click on a contact from the list to manage their chat, cart, orders, and support tickets.</p>
       </div>
@@ -41,17 +42,22 @@ function ContactDetail({ contact, onDelete, onToggleBot, onResolveTicket, onUpda
       
       {/* Customer Summary Header */}
       <div className="bg-white px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 z-10">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-bold text-lg text-gray-800">{contact.name || contact.phone}</h2>
-            {contact.is_paused && (
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-            )}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-wa-teal/10 text-wa-teal flex items-center justify-center font-bold text-lg shrink-0 border border-wa-teal/20">
+            {contact.name ? contact.name.charAt(0).toUpperCase() : 'W'}
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">+{contact.phone}</p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-lg text-gray-800">{contact.name || contact.phone}</h2>
+              {contact.is_paused && (
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">+{contact.phone}</p>
+          </div>
         </div>
         
         <div className="flex gap-2 items-center">
@@ -107,6 +113,18 @@ function ContactDetail({ contact, onDelete, onToggleBot, onResolveTicket, onUpda
               className="absolute inset-0 opacity-5 pointer-events-none"
               style={{ backgroundImage: 'url(\'data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z" fill="%23075E54" fill-rule="evenodd"/%3E%3C/svg%3E\')' }}
             ></div>
+
+            {/* Top Bot Header Banner */}
+            <div className="bg-white/90 backdrop-blur-xs px-4 py-2 border-b border-gray-200/80 flex items-center justify-between z-10 shadow-xs">
+              <div className="flex items-center gap-2">
+                <img src={logoImg} alt="Mansara Foods DP" className="w-6 h-6 rounded-full bg-white object-contain p-0.5 border border-wa-teal/30 shadow-xs" />
+                <span className="font-bold text-xs text-wa-teal">Mansara Foods WhatsApp Bot</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold border border-emerald-100 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Bot DP Verified
+              </span>
+            </div>
+
             <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-2.5 z-10">
               {contact.messages && contact.messages.map((msg, idx) => {
                 const isSystemAction = msg.text && (msg.text.startsWith('btn_') || msg.text.startsWith('cat_') || msg.text.startsWith('add_') || msg.text.startsWith('wish_') || msg.text.startsWith('pay_'));
@@ -123,11 +141,19 @@ function ContactDetail({ contact, onDelete, onToggleBot, onResolveTicket, onUpda
                 }
 
                 return (
-                  <div key={idx} className="max-w-[75%] px-3 py-2 rounded-lg text-sm shadow-[0_1px_1px_rgba(0,0,0,0.08)] self-end bg-bubble-sent relative">
-                    <span className="break-words" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br>') }} />
-                    <span className="block text-[9px] text-gray-400 text-right mt-1">
-                      {formatTime(msg.time)}
-                    </span>
+                  <div key={idx} className="flex gap-2 self-end max-w-[80%] items-end">
+                    <div className="px-3 py-2 rounded-lg text-sm shadow-[0_1px_1px_rgba(0,0,0,0.08)] bg-bubble-sent relative flex-1">
+                      <span className="break-words" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br>') }} />
+                      <span className="block text-[9px] text-gray-400 text-right mt-1">
+                        {formatTime(msg.time)}
+                      </span>
+                    </div>
+                    <img 
+                      src={logoImg} 
+                      alt="Mansara Bot DP" 
+                      className="w-6 h-6 rounded-full bg-white object-contain p-0.5 border border-wa-teal/30 shadow-xs mb-0.5 shrink-0" 
+                      title="Mansara Foods WhatsApp Bot DP"
+                    />
                   </div>
                 );
               })}

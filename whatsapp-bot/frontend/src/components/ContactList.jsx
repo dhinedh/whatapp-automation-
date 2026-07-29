@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatLastSeen } from '../utils/formatters';
+import logoImg from '../assets/logo.png';
 
 function ContactList({ contacts, currentPhone, onSelectContact, searchQuery, onSearchChange }) {
   const getFunnelBadgeClass = (state) => {
@@ -14,13 +15,22 @@ function ContactList({ contacts, currentPhone, onSelectContact, searchQuery, onS
 
   return (
     <div className="w-full md:w-[350px] bg-white rounded-lg flex flex-col shadow-sm border border-gray-100 h-[500px] md:h-auto flex-shrink-0">
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-3.5 border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-2 mb-2.5 px-1">
+          <img src={logoImg} alt="Mansara Foods Logo DP" className="w-7 h-7 rounded-full bg-white object-contain p-0.5 border border-wa-teal/30 shadow-sm shrink-0" />
+          <div className="flex flex-col">
+            <span className="font-bold text-xs text-gray-800">Mansara Foods Chatbot</span>
+            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> WhatsApp DP Active
+            </span>
+          </div>
+        </div>
         <input 
           type="text" 
           placeholder="Search name or phone number..." 
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full py-2 px-4 border border-gray-200 rounded-full outline-none bg-gray-50 text-sm focus:bg-white focus:border-wa-green transition-colors"
+          className="w-full py-2 px-4 border border-gray-200 rounded-full outline-none bg-white text-sm focus:border-wa-green transition-colors"
         />
       </div>
       

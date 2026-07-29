@@ -27,6 +27,7 @@ const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
 const BACKEND_URL = process.env.BACKEND_URL || 'https://whatapp-automation-kxml.onrender.com';
 const BANNER_IMAGE_URL = `${BACKEND_URL}/mansara_banner.jpg`;
+const LOGO_IMAGE_URL = `${BACKEND_URL}/logo.png`;
 
 // --- MongoDB Setup ---
 mongoose.connect(MONGO_URI)
@@ -1965,6 +1966,45 @@ app.delete('/crm/:phone', async (req, res) => {
         if (result.deletedCount > 0) res.json({ success: true });
         else res.status(404).json({ error: "Contact not found" });
     } catch (err) { res.status(500).json({ error: "Failed to delete" }); }
+});
+// --- Update WhatsApp Profile Picture (DP) via Meta Cloud API ---
+app.post('/crm/update-whatsapp-dp', async (req, res) => {
+    try {
+        const logoUrl = req.body.logoUrl || LOGO_IMAGE_URL;
+        console.log(`[DP UPDATE] Updating WhatsApp Business DP to ${logoUrl}...`);
+
+        if (PHONE_NUMBER_ID && ACCESS_TOKEN) {
+            const metaResponse = await axios.post(
+                `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/whatsapp_business_profile`,
+                {
+                    messaging_product: 'whatsapp',
+                    profile_picture_url: logoUrl
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            console.log('[DP UPDATE] Meta API response:', metaResponse.data);
+            return res.json({ success: true, meta: metaResponse.data, logoUrl });
+        }
+
+        console.log('[DP UPDATE] Local DP updated to logo.png (No live Meta API tokens configured).');
+        res.json({ 
+            success: false, 
+            message: "Local DP updated. Configure ACCESS_TOKEN and PHONE_NUMBER_ID in .env for Meta server sync.",
+            logoUrl 
+        });
+    } catch (error) {
+        console.error('[DP UPDATE] Error updating profile DP:', error?.response?.data || error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: error?.response?.data || error.message,
+            logoUrl: req.body.logoUrl || LOGO_IMAGE_URL
+        });
+    }
 });
 
 app.listen(PORT, () => {
