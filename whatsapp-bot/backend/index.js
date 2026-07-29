@@ -614,8 +614,8 @@ async function handleBotReply(phone, messageText, contact) {
     // --- 1. MAIN MENU ROUTING (Options 1 to 4) ---
     if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
         // Option 1: Shop Products
-        if (msg === '1' || msg === '1️⃣' || msg.includes('shop') || msg === 'opt_1_shop' || msg === 'opt_1_products') {
-            await sendProductCategoriesMenu(phone, contact);
+        if (msg === '1' || msg === '1️⃣' || msg.includes('shop') || msg === 'opt_1_shop' || msg === 'opt_1_products' || msg === 'btn_catalog') {
+            await sendShopProductsMenu(phone, contact);
             return;
         }
         // Option 2: Orders
@@ -1406,11 +1406,15 @@ async function sendShopProductsMenu(phone, contact) {
     await contact.save();
 
     const topProducts = PRODUCTS.slice(0, 8);
-    const topRows = topProducts.map((item, idx) => ({
-        id: `item_select_${item.id}`,
-        title: `${idx + 1}. ${item.name.slice(0, 21)}`,
-        description: `${item.weight} – ₹${item.price}`
-    }));
+    const topRows = topProducts.map((item, idx) => {
+        const prefix = `${idx + 1}. `;
+        const maxNameLen = 24 - prefix.length;
+        return {
+            id: `item_select_${item.id}`,
+            title: `${prefix}${item.name.slice(0, maxNameLen)}`.substring(0, 24),
+            description: `${item.weight} – ₹${item.price}`
+        };
+    });
 
     const sections = [
         {
@@ -1440,11 +1444,15 @@ async function sendMoreProductsMenu(phone, contact) {
     await contact.save();
 
     const remainingProducts = PRODUCTS.slice(8);
-    const remainingRows = remainingProducts.map((item, idx) => ({
-        id: `item_select_${item.id}`,
-        title: `${idx + 9}. ${item.name.slice(0, 20)}`,
-        description: `${item.weight} – ₹${item.price}`
-    }));
+    const remainingRows = remainingProducts.map((item, idx) => {
+        const prefix = `${idx + 9}. `;
+        const maxNameLen = 24 - prefix.length;
+        return {
+            id: `item_select_${item.id}`,
+            title: `${prefix}${item.name.slice(0, maxNameLen)}`.substring(0, 24),
+            description: `${item.weight} – ₹${item.price}`
+        };
+    });
 
     const sections = [
         {
