@@ -97,27 +97,163 @@ const contactSchema = new mongoose.Schema({
 
 const Contact = mongoose.model('Contact', contactSchema);
 
-// --- Mansara Foods Products Database (mansarafoods.com) ---
+// --- Mansara Foods Products Database (synced with mansarafoods.com & website DB) ---
 const PRODUCTS = [
     // Health Mixes & Porridge
-    { id: "prod_ragi_choco", name: "Ragi Choco Malt", category: "Health Mixes", weight: "250g", price: 250, stock: 100, description: "Nutritious health drink mix combining pure Ragi (finger millet) with premium cocoa." },
-    { id: "prod_nutriminix", name: "Nutriminix Multi-Grain Mix", category: "Health Mixes", weight: "250g", price: 200, stock: 100, description: "Traditional 27-ingredient health mix with Kavuni black rice, samba wheat, barley & millets." },
-    { id: "prod_urad_classic", name: "Urad Porridge Mix - Classic", category: "Health Mixes", weight: "250g", price: 180, stock: 90, description: "Traditional wholesome black gram porridge mix for everyday strength." },
-    { id: "prod_urad_premium", name: "Urad Porridge Mix - Premium", category: "Health Mixes", weight: "250g", price: 210, stock: 80, description: "Blend of black gram, ragi, and heritage rice varieties." },
-    { id: "prod_urad_salt_pepper", name: "Urad Mix - Salt n Pepper", category: "Health Mixes", weight: "250g", price: 180, stock: 85, description: "Savoury health mix variant crafted with cumin and black pepper." },
-    { id: "prod_urad_millet", name: "Urad Mix - Millet Magic", category: "Health Mixes", weight: "250g", price: 190, stock: 90, description: "Wholesome blend of black gram with nutrient-dense millets." },
-    { id: "prod_kavuni_mix", name: "Black Rice Delight (Kavuni)", category: "Health Mixes", weight: "250g", price: 220, stock: 90, description: "Royal Kavuni black rice porridge mix loaded with natural antioxidants." },
+    { 
+        id: "69a91a0c4ee07f2c99a1aea1", 
+        name: "Ragi Choco Malt", 
+        category: "Health Mixes", 
+        weight: "250g", 
+        price: 250, 
+        offerPrice: 245,
+        stock: 100, 
+        description: "Nutritious health drink mix combining Ragi (Finger Millet) with premium cocoa, brown sugar, almonds & saffron." 
+    },
+    { 
+        id: "69a9b4091c2c00db0a9bf83e", 
+        name: "Nutriminix Multi-Grain Mix", 
+        category: "Health Mixes", 
+        weight: "250g", 
+        price: 200, 
+        offerPrice: 195,
+        stock: 99, 
+        description: "Traditional 27-ingredient health mix with Kavuni black rice, samba wheat, barley & millets." 
+    },
+    { 
+        id: "69620f7e7f9c4b0e78ddbc4d", 
+        name: "Urad Health Mix - Classic", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Time-tested nourishing blend made primarily from premium black gram (Urad Dal) and samba wheat." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc50", 
+        name: "Urad Health Mix - Premium", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Formulated with black gram, ragi, Kavuni black rice, and traditional Indian rice varieties." 
+    },
+    { 
+        id: "69620f7e7f9c4b0e78ddbc4e", 
+        name: "Urad Mix - Salt n Pepper", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Savoury porridge variant infused with black pepper and cumin seeds for gut health." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc4f", 
+        name: "Urad Mix - Millet Magic", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Nutritious porridge mix crafted with black gram and a carefully balanced selection of 7 millets." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc51", 
+        name: "Black Rice Delight (Kavuni)", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Traditional black rice (Karuppu Kavuni) porridge mix rich in antioxidants and iron." 
+    },
 
-    // Rice Podi Mixes
-    { id: "prod_idli_podi", name: "Traditional Idly Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 150, description: "Millet-fusion style spicy roasted dal & red chili podi for idly & dosa." },
-    { id: "prod_paruppu_podi", name: "Homestyle Paruppu Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 120, description: "Protein-rich lentil rice powder delicious with hot rice & ghee." },
-    { id: "prod_curry_leaf_podi", name: "Curry Leaves Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 100, description: "Traditional Karuveppilai rice podi rich in iron and vitamins." },
-    { id: "prod_coriander_podi", name: "Coriander Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 100, description: "Fragrant roasted coriander & lentil powder mix for rice." },
-    { id: "prod_moringa_podi", name: "Moringa Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 110, description: "Superfood Moringa leaf rice mix packed with essential nutrients." },
-    { id: "prod_pirandai_podi", name: "Pirandai Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, stock: 95, description: "Medicinal Veldt Grape (Pirandai) rice mix supporting digestion." },
+    // Idly Podi & Rice Mixes
+    { 
+        id: "69620f7f7f9c4b0e78ddbc52", 
+        name: "Idly Podi - Millet Fusion", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Nutritious millet-enriched idly podi combining lentils, 4 millets, and roasted spices." 
+    },
+    { 
+        id: "69a9b40c1c2c00db0a9bf83f", 
+        name: "Idly Podi - Traditional", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Classic South Indian idly podi made from roasted lentils, dry red chillies, and spices." 
+    },
+    { 
+        id: "69a9b40e1c2c00db0a9bf840", 
+        name: "Homestyle Paruppu Rice Podi", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Protein-rich lentil rice powder delicious with hot rice & ghee." 
+    },
+    { 
+        id: "69a9b4111c2c00db0a9bf841", 
+        name: "Curry Leaves Rice Podi", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Traditional Karuveppilai rice podi rich in iron and essential vitamins." 
+    },
+    { 
+        id: "69a9b4131c2c00db0a9bf842", 
+        name: "Coriander Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Fragrant roasted coriander & lentil powder mix for hot rice." 
+    },
+    { 
+        id: "69a9b4151c2c00db0a9bf843", 
+        name: "Moringa Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Superfood Moringa leaf rice mix packed with essential nutrients." 
+    },
+    { 
+        id: "69a9b4251c2c00db0a9bf844", 
+        name: "Pirandai Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Medicinal Veldt Grape (Pirandai) rice mix supporting digestive wellness." 
+    },
 
     // Combos & Value Packs
-    { id: "prod_wellness_combo", name: "Ultimate Wellness Combo", category: "Combos & Packs", weight: "5 Mixes Pack", price: 330, stock: 50, description: "Special value combo featuring 5 signature porridge blends." }
+    { 
+        id: "6967d5e7c88a08abbf51f0ac", 
+        name: "Ultimate Wellness Combo", 
+        category: "Combos & Packs", 
+        weight: "5 Mixes Pack", 
+        price: 330, 
+        offerPrice: 330,
+        stock: 50, 
+        description: "Value pack of all 5 signature porridge mixes (Classic, Premium, Salt & Pepper, Millet Magic & Black Rice)." 
+    }
 ];
 
 // --- Helper to check target number 7904441760 ---
