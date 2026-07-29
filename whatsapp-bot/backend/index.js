@@ -2205,6 +2205,34 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
     }
 });
 
+// --- Direct OTP Delivery API (Website Registration & Forgot Password) ---
+app.post('/api/send-otp', async (req, res) => {
+    try {
+        const { phone, otp, type } = req.body;
+        if (!phone || !otp) {
+            return res.status(400).json({ success: false, error: "phone and otp are required" });
+        }
+
+        const cleanPhone = phone.toString().replace(/\D/g, '');
+        const targetPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
+        let message = "";
+        if (type === 'forgot_password') {
+            message = `🔐 *Mansara Foods - Password Reset Code*\n\nNamaste! 🙏\nYour verification code is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+        } else {
+            message = `🌿 *Welcome to Mansara Foods!* 🙏\n\nYour account registration verification code is: *${otp}*\n\nValid for 10 minutes. Please enter this code on the website to verify your account.`;
+        }
+
+        console.log(`[API SEND OTP] Sending OTP to ${targetPhone} (type: ${type || 'registration'})...`);
+        await sendMessage(targetPhone, message);
+
+        res.json({ success: true, message: `OTP sent to ${targetPhone} via WhatsApp`, phone: targetPhone });
+    } catch (error) {
+        console.error('[API SEND OTP ERROR]:', error.message || error);
+        res.status(500).json({ success: false, error: error.message || "Failed to send OTP" });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
