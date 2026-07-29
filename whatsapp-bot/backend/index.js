@@ -1970,15 +1970,44 @@ app.delete('/crm/:phone', async (req, res) => {
 // --- Update WhatsApp Profile Picture (DP) via Meta Cloud API ---
 app.post('/crm/update-whatsapp-dp', async (req, res) => {
     try {
-        const logoUrl = req.body.logoUrl || LOGO_IMAGE_URL;
-        console.log(`[DP UPDATE] Updating WhatsApp Business DP to ${logoUrl}...`);
+        console.log(`[DP UPDATE] Initiating official Meta WhatsApp Business DP upload...`);
 
         if (PHONE_NUMBER_ID && ACCESS_TOKEN) {
+            const jpgPath = path.join(__dirname, 'public', 'logo_dp.jpg');
+            const fileBuffer = fs.readFileSync(jpgPath);
+            const fileLength = fileBuffer.length;
+
+            // Step 1: Create Meta Resumable Upload Session
+            const sessionRes = await axios.post(
+                `https://graph.facebook.com/v19.0/app/uploads`,
+                null,
+                {
+                    params: { file_length: fileLength, file_type: 'image/jpeg' },
+                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+                }
+            );
+            const uploadHandle = sessionRes.data.id;
+
+            // Step 2: Upload Binary Data to Meta
+            const uploadRes = await axios.post(
+                `https://graph.facebook.com/v19.0/${uploadHandle}`,
+                fileBuffer,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'file_offset': '0',
+                        'Content-Type': 'image/jpeg'
+                    }
+                }
+            );
+            const pictureHandle = uploadRes.data.h;
+
+            // Step 3: Update WhatsApp Business Profile Picture Handle
             const metaResponse = await axios.post(
                 `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/whatsapp_business_profile`,
                 {
                     messaging_product: 'whatsapp',
-                    profile_picture_url: logoUrl
+                    profile_picture_handle: pictureHandle
                 },
                 {
                     headers: {
@@ -1987,22 +2016,20 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
                     }
                 }
             );
-            console.log('[DP UPDATE] Meta API response:', metaResponse.data);
-            return res.json({ success: true, meta: metaResponse.data, logoUrl });
+
+            console.log('[DP UPDATE] Success! Meta profile picture handle updated:', metaResponse.data);
+            return res.json({ success: true, meta: metaResponse.data, logoUrl: `${BACKEND_URL}/logo_dp.jpg` });
         }
 
-        console.log('[DP UPDATE] Local DP updated to logo.png (No live Meta API tokens configured).');
         res.json({ 
             success: false, 
-            message: "Local DP updated. Configure ACCESS_TOKEN and PHONE_NUMBER_ID in .env for Meta server sync.",
-            logoUrl 
+            message: "Local DP updated. Configure ACCESS_TOKEN and PHONE_NUMBER_ID in .env for Meta server sync."
         });
     } catch (error) {
         console.error('[DP UPDATE] Error updating profile DP:', error?.response?.data || error.message);
         res.status(500).json({ 
             success: false, 
-            error: error?.response?.data || error.message,
-            logoUrl: req.body.logoUrl || LOGO_IMAGE_URL
+            error: error?.response?.data || error.message
         });
     }
 });
