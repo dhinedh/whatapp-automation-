@@ -2205,10 +2205,36 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
     }
 });
 
+async function sendTemplateMessage(to, templateName, languageCode = 'en', components = []) {
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return false;
+    try {
+        const response = await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            data: {
+                messaging_product: 'whatsapp',
+                to: to,
+                type: 'template',
+                template: {
+                    name: templateName,
+                    language: { code: languageCode },
+                    ...(components.length > 0 ? { components: components } : {})
+                }
+            }
+        });
+        console.log(`[sendTemplateMessage] Success sending '${templateName}' to ${to}:`, response.data?.messages?.[0]?.id);
+        return true;
+    } catch (error) {
+        console.error(`[sendTemplateMessage] Error sending '${templateName}' to ${to}:`, error.response ? error.response.data : error.message);
+        return false;
+    }
+}
+
 // --- Direct OTP Delivery API (Website Registration & Forgot Password) ---
 app.post('/api/send-otp', async (req, res) => {
     try {
-        const { phone, otp, type } = req.body;
+        const { phone, otp, type, templateName } = req.body;
         if (!phone || !otp) {
             return res.status(400).json({ success: false, error: "phone and otp are required" });
         }
@@ -2216,15 +2242,30 @@ app.post('/api/send-otp', async (req, res) => {
         const cleanPhone = phone.toString().replace(/\D/g, '');
         const targetPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
 
-        let message = "";
-        if (type === 'forgot_password') {
-            message = `🔐 *Mansara Foods - Password Reset Code*\n\nNamaste! 🙏\nYour verification code is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
-        } else {
-            message = `🌿 *Welcome to Mansara Foods!* 🙏\n\nYour account registration verification code is: *${otp}*\n\nValid for 10 minutes. Please enter this code on the website to verify your account.`;
-        }
+        const activeTemplate = templateName || process.env.OTP_TEMPLATE_NAME || 'mansara_otp';
 
-        console.log(`[API SEND OTP] Sending OTP to ${targetPhone} (type: ${type || 'registration'})...`);
-        await sendMessage(targetPhone, message);
+        // 1. Try Meta Template Message (bypasses 24-hour window rule for new customers)
+        console.log(`[API SEND OTP] Attempting Template '${activeTemplate}' for ${targetPhone}...`);
+        const templateSent = await sendTemplateMessage(targetPhone, activeTemplate, 'en', [
+            {
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: String(otp) }
+                ]
+            }
+        ]);
+
+        // 2. Fallback to free-form text message if template is not setup or fails
+        if (!templateSent) {
+            console.log(`[API SEND OTP] Fallback: Sending text message OTP to ${targetPhone}...`);
+            let message = "";
+            if (type === 'forgot_password') {
+                message = `🔐 *Mansara Foods - Password Reset Code*\n\nNamaste! 🙏\nYour verification code is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+            } else {
+                message = `🌿 *Welcome to Mansara Foods!* 🙏\n\nYour account registration verification code is: *${otp}*\n\nValid for 10 minutes. Please enter this code on the website to verify your account.`;
+            }
+            await sendMessage(targetPhone, message);
+        }
 
         res.json({ success: true, message: `OTP sent to ${targetPhone} via WhatsApp`, phone: targetPhone });
     } catch (error) {
