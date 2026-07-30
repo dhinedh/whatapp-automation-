@@ -481,6 +481,10 @@ const MESSAGES = {
 // --- Chatbot Logic ---
 async function handleBotReply(phone, messageText, contact) {
 
+    // Admin Status Command Interceptor (from Admin WhatsApp 918838887064 or button clicks)
+    const isAdminCmd = await handleAdminCommand(phone, messageText);
+    if (isAdminCmd) return;
+
     // Target number 7904441760 special rule: if not paused, auto-consent and allow multi-use & multi-sending
     if (isTargetNumber(phone) && !contact.is_paused) {
         if (contact.consent !== true) {
@@ -1105,8 +1109,18 @@ async function handleBotReply(phone, messageText, contact) {
                     { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
                 ]);
 
-                // Sync CRM Lead Webhook
+                // Sync CRM Lead Webhook & Notify Admin WhatsApp
                 syncCrmOrder(contact, newOrder);
+                notifyAdminNewOrder({
+                    orderId: newOrder.orderId,
+                    customerName: contact.name || 'WhatsApp Customer',
+                    customerPhone: phone,
+                    address: contact.address || 'N/A',
+                    items: newOrder.items,
+                    total: newOrder.total,
+                    paymentMethod: 'COD',
+                    paymentStatus: 'COD'
+                }).catch(err => console.error('[ADMIN NOTIFY ERROR]:', err.message));
             } else {
                 // Online Payment Flow
                 contact.step = 'payment_pending';
@@ -2271,6 +2285,162 @@ app.post('/api/send-otp', async (req, res) => {
     } catch (error) {
         console.error('[API SEND OTP ERROR]:', error.message || error);
         res.status(500).json({ success: false, error: error.message || "Failed to send OTP" });
+    }
+});
+
+// --- Admin WhatsApp Order & Status Command Functions ---
+async function handleAdminCommand(phone, messageText) {
+    const rawMsg = (messageText || '').trim();
+    let orderId = "";
+    let newStatus = "";
+
+    // 1. Button payload: adm_Status_OrderId (e.g. adm_Shipped_ORD-123456)
+    if (rawMsg.startsWith('adm_')) {
+        const parts = rawMsg.split('_');
+        if (parts.length >= 3) {
+            newStatus = parts[1]; // Packed, Shipped, Delivered, Cancelled
+            orderId = parts.slice(2).join('_');
+        }
+    } else {
+        // 2. Text command: "ORD-123456 Packed" or "ORD123456 Shipped"
+        const tokens = rawMsg.split(/\s+/);
+        if (tokens.length >= 2) {
+            const firstToken = tokens[0].toUpperCase();
+            const secondToken = tokens[1];
+            if (firstToken.startsWith('ORD')) {
+                orderId = firstToken;
+                const statusInput = secondToken.toLowerCase();
+                if (statusInput.includes('pack')) newStatus = 'Packed';
+                else if (statusInput.includes('ship')) newStatus = 'Shipped';
+                else if (statusInput.includes('deliv')) newStatus = 'Delivered';
+                else if (statusInput.includes('canc')) newStatus = 'Cancelled';
+            }
+        }
+    }
+
+    if (!orderId || !newStatus) return false;
+
+    console.log(`[ADMIN COMMAND] Admin ${phone} requested status update: Order ${orderId} -> ${newStatus}`);
+
+    let customerPhone = "";
+
+    // A. Update in Website Backend DB (Order model)
+    try {
+        const OrderModel = mongoose.model('Order');
+        const dbOrder = await OrderModel.findOne({ orderId: new RegExp(`^${orderId}$`, 'i') }).populate('user');
+        if (dbOrder) {
+            dbOrder.orderStatus = newStatus;
+            await dbOrder.save();
+            if (dbOrder.user) {
+                customerPhone = dbOrder.user.whatsapp || dbOrder.user.phone;
+            }
+            console.log(`[ADMIN COMMAND] Updated website DB Order ${orderId} to ${newStatus}`);
+        }
+    } catch (e) {
+        console.warn('[ADMIN COMMAND] Could not update website DB directly:', e.message);
+    }
+
+    // B. Update in Contact DB (whatsapp-bot)
+    try {
+        const contactWithOrder = await Contact.findOne({ "orders.orderId": new RegExp(`^${orderId}$`, 'i') });
+        if (contactWithOrder) {
+            const orderObj = contactWithOrder.orders.find(o => o.orderId.toUpperCase() === orderId.toUpperCase());
+            if (orderObj) {
+                orderObj.status = newStatus;
+                await contactWithOrder.save();
+                if (!customerPhone) customerPhone = contactWithOrder.phone;
+            }
+            console.log(`[ADMIN COMMAND] Updated Contact DB Order ${orderId} to ${newStatus}`);
+        }
+    } catch (e) {
+        console.warn('[ADMIN COMMAND] Could not update contact DB:', e.message);
+    }
+
+    // C. Notify Customer on WhatsApp
+    if (customerPhone) {
+        const cleanCustPhone = customerPhone.replace(/\D/g, '');
+        const targetCustPhone = cleanCustPhone.length === 10 ? '91' + cleanCustPhone : cleanCustPhone;
+
+        let statusEmoji = "📦";
+        if (newStatus === 'Shipped') statusEmoji = "🚚";
+        else if (newStatus === 'Delivered') statusEmoji = "✅";
+        else if (newStatus === 'Cancelled') statusEmoji = "❌";
+
+        const custMsg = `${statusEmoji} *Mansara Foods Order Update!*\n\n` +
+            `Hi! Your order *${orderId}* status has been updated to: *${newStatus}* ${statusEmoji}\n\n` +
+            `📍 Track status: https://mansarafoods.com/order-tracking/${orderId}\n\n` +
+            `Thank you for choosing Mansara Foods! 🙏`;
+
+        await sendMessage(targetCustPhone, custMsg);
+    }
+
+    // D. Send Confirmation to Admin
+    const confirmMsg = `✅ *Order Status Updated Successfully!*\n\n` +
+        `📦 *Order ID:* ${orderId}\n` +
+        `🔄 *New Status:* ${newStatus}\n` +
+        `👤 *Customer Notified:* ${customerPhone || 'N/A'}`;
+
+    await sendMessage(phone, confirmMsg);
+    return true;
+}
+
+// --- Helper to Send Admin Order Notification ---
+async function notifyAdminNewOrder(orderData) {
+    const adminPhone = process.env.ADMIN_PHONE || '918838887064';
+
+    const itemsText = (orderData.items || []).map(i => `• ${i.quantity}x ${i.name || i.title} (${i.weight || ''}) – ₹${i.price * i.quantity}`).join('\n');
+    const addr = typeof orderData.address === 'object'
+        ? `${orderData.address.street || ''}, ${orderData.address.city || ''}, ${orderData.address.state || ''} - ${orderData.address.zip || ''}`
+        : (orderData.address || 'N/A');
+
+    const alertMsg = `🛍️ *NEW ORDER RECEIVED!* 🛒\n\n` +
+        `📦 *Order ID:* ${orderData.orderId}\n` +
+        `👤 *Customer:* ${orderData.customerName || 'N/A'}\n` +
+        `📞 *Phone:* ${orderData.customerPhone || 'N/A'}\n` +
+        `📍 *Address:* ${addr}\n` +
+        `💳 *Payment:* ${orderData.paymentMethod || 'COD'} (${orderData.paymentStatus || 'Pending'})\n\n` +
+        `🛒 *Items Ordered:*\n${itemsText}\n\n` +
+        `💰 *Total Amount:* ₹${orderData.total}\n\n` +
+        `👇 *Tap below to update order status:*`;
+
+    await sendInteractiveButtons(adminPhone, alertMsg, [
+        { id: `adm_Packed_${orderData.orderId}`, title: "Packed 📦" },
+        { id: `adm_Shipped_${orderData.orderId}`, title: "Shipped 🚚" },
+        { id: `adm_Delivered_${orderData.orderId}`, title: "Delivered ✅" }
+    ]);
+}
+
+// --- Admin Order Alert API Endpoint ---
+app.post('/api/notify-admin-order', async (req, res) => {
+    try {
+        await notifyAdminNewOrder(req.body);
+        res.json({ success: true, message: "Admin order alert sent" });
+    } catch (error) {
+        console.error('[API NOTIFY ADMIN ORDER ERROR]:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// --- Admin Low / Out of Stock Alert API Endpoint ---
+app.post('/api/notify-admin-stock', async (req, res) => {
+    try {
+        const { productName, stock } = req.body;
+        const adminPhone = process.env.ADMIN_PHONE || '918838887064';
+
+        let alertMsg = "";
+        if (stock <= 0) {
+            alertMsg = `🚨 *OUT OF STOCK ALERT!* ❌\n\nProduct: *${productName}*\nRemaining Stock: *0 items*\n\n⚠️ This product is now OUT OF STOCK on website and WhatsApp bot catalog. Please restock immediately!`;
+        } else {
+            alertMsg = `⚠️ *LOW STOCK ALERT!* 📦\n\nProduct: *${productName}*\nRemaining Stock: *${stock} items*\n\n💡 Stock is running low. Please re-order soon!`;
+        }
+
+        console.log(`[STOCK ALERT] Sending stock alert for ${productName} (stock: ${stock}) to Admin ${adminPhone}...`);
+        await sendMessage(adminPhone, alertMsg);
+
+        res.json({ success: true, message: `Stock alert sent to Admin ${adminPhone}` });
+    } catch (error) {
+        console.error('[API NOTIFY ADMIN STOCK ERROR]:', error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
