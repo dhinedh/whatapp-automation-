@@ -4,8 +4,6 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cron = require('node-cron');
-const path = require('path');
-const fs = require('fs');
 
 const app = express();
 app.use(cors({
@@ -33,7 +31,7 @@ const LOGO_IMAGE_URL = `${BACKEND_URL}/logo.png`;
 
 // --- MongoDB Setup ---
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB Cluster'))
+  .then(() => console.log('✅ Connected to MongoDB'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 const contactSchema = new mongoose.Schema({
@@ -57,16 +55,15 @@ const contactSchema = new mongoose.Schema({
     is_paused: { type: Boolean, default: false },
 
     // Mansara Foods E-commerce Fields
-    language: { type: String, default: "en" }, // 'en', 'ta'
-    consent: { type: Boolean, default: true }, // Defaults to true so direct notifications (order, status, cart, reviews) send automatically without requiring 'hi'
-    consentDate: { type: Date, default: Date.now },
+    language: { type: String, default: "en" }, // 'en', 'hi'
+    consent: { type: Boolean, default: null }, // true, false, null
+    consentDate: { type: Date },
     cart: [{
         productId: String,
         name: String,
         price: Number,
         quantity: Number
     }],
-    lastCartNudgeDate: { type: Date }, // Tracks 2-day (48-hour) recurring cart reminder
     wishlist: [String],
     address: { type: String, default: "" },
     orders: [{
@@ -94,382 +91,187 @@ const contactSchema = new mongoose.Schema({
     }],
     selectedCategory: { type: String, default: "" },
     selectedProductId: { type: String, default: "" },
-    step: { type: String, default: "welcome" }, // welcome, consent_pending, language_selection, main_menu, checkout_address, checkout_payment_mode, payment_pending, coupon_entry, orders_menu, reschedule_entry, cancel_entry, support_menu, ticket_entry, feedback_pending
+    step: { type: String, default: "welcome" }, // welcome, consent_pending, language_selection, main_menu, checkout_address, checkout_payment_mode, payment_pending, coupon_entry, orders_menu, reschedule_entry, cancel_entry, support_menu, ticket_entry
     funnelState: { type: String, default: "onboarding" } // onboarding, browsing, cart, checkout, completed
 });
 
 const Contact = mongoose.model('Contact', contactSchema);
 
-// --- Website Database Mongoose Models Integration ---
-const backendModelsDir = path.resolve(__dirname, '../../../mansara backend/models');
-
-let ProductModel, OrderModel, CategoryModel, UserModel, SettingModel;
-
-try {
-    const prodModule = require(path.join(backendModelsDir, 'Product'));
-    ProductModel = prodModule.Product || prodModule;
-    console.log('✅ Registered website Product model');
-} catch (e) {
-    console.warn('⚠️ Fallback Product model:', e.message);
-    ProductModel = mongoose.models.Product || mongoose.model('Product', new mongoose.Schema({ name: String, price: Number, offerPrice: Number, stock: Number, category: String, description: String, image: String, isActive: Boolean }, { strict: false }));
-}
-
-try {
-    OrderModel = require(path.join(backendModelsDir, 'Order'));
-    console.log('✅ Registered website Order model');
-} catch (e) {
-    console.warn('⚠️ Fallback Order model:', e.message);
-    OrderModel = mongoose.models.Order || mongoose.model('Order', new mongoose.Schema({ orderId: String }, { strict: false }));
-}
-
-try {
-    CategoryModel = require(path.join(backendModelsDir, 'Category'));
-    console.log('✅ Registered website Category model');
-} catch (e) {
-    console.warn('⚠️ Fallback Category model:', e.message);
-    CategoryModel = mongoose.models.Category || mongoose.model('Category', new mongoose.Schema({ name: String }, { strict: false }));
-}
-
-try {
-    UserModel = require(path.join(backendModelsDir, 'User'));
-    console.log('✅ Registered website User model');
-} catch (e) {
-    console.warn('⚠️ Fallback User model:', e.message);
-    UserModel = mongoose.models.User || mongoose.model('User', new mongoose.Schema({ name: String, phone: String, whatsapp: String }, { strict: false }));
-}
-
-try {
-    SettingModel = require(path.join(backendModelsDir, 'Setting'));
-    console.log('✅ Registered website Setting model');
-} catch (e) {
-    console.warn('⚠️ Fallback Setting model:', e.message);
-    SettingModel = mongoose.models.Setting || mongoose.model('Setting', new mongoose.Schema({}, { strict: false }));
-}
-
-// --- Mansara Foods Fallback Products Dataset ---
+// --- Mansara Foods Products Database (synced with mansarafoods.com & website DB) ---
 const PRODUCTS = [
-    { id: "69a91a0c4ee07f2c99a1aea1", name: "Ragi Choco Malt", category: "Health Mixes", weight: "250g", price: 250, offerPrice: 245, stock: 100, description: "Nutritious health drink mix combining Ragi (Finger Millet) with premium cocoa, brown sugar, almonds & saffron." },
-    { id: "69a9b4091c2c00db0a9bf83e", name: "Nutriminix Multi-Grain Mix", category: "Health Mixes", weight: "250g", price: 200, offerPrice: 195, stock: 99, description: "Traditional 27-ingredient health mix with Kavuni black rice, samba wheat, barley & millets." },
-    { id: "69620f7e7f9c4b0e78ddbc4d", name: "Urad Health Mix - Classic", category: "Health Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 50, description: "Time-tested nourishing blend made primarily from premium black gram (Urad Dal) and samba wheat." },
-    { id: "69620f7f7f9c4b0e78ddbc50", name: "Urad Health Mix - Premium", category: "Health Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 50, description: "Formulated with black gram, ragi, Kavuni black rice, and traditional Indian rice varieties." },
-    { id: "69620f7e7f9c4b0e78ddbc4e", name: "Urad Mix - Salt n Pepper", category: "Health Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 50, description: "Savoury porridge variant infused with black pepper and cumin seeds for gut health." },
-    { id: "69620f7f7f9c4b0e78ddbc4f", name: "Urad Mix - Millet Magic", category: "Health Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 50, description: "Nutritious porridge mix crafted with black gram and a carefully balanced selection of 7 millets." },
-    { id: "69620f7f7f9c4b0e78ddbc51", name: "Black Rice Delight (Kavuni)", category: "Health Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 50, description: "Traditional black rice (Karuppu Kavuni) porridge mix rich in antioxidants and iron." },
-    { id: "69620f7f7f9c4b0e78ddbc52", name: "Idly Podi - Millet Fusion", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Nutritious millet-enriched idly podi combining lentils, 4 millets, and roasted spices." },
-    { id: "69a9b40c1c2c00db0a9bf83f", name: "Idly Podi - Traditional", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Classic South Indian idly podi made from roasted lentils, dry red chillies, and spices." },
-    { id: "69a9b40e1c2c00db0a9bf840", name: "Homestyle Paruppu Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Protein-rich lentil rice powder delicious with hot rice & ghee." },
-    { id: "69a9b4111c2c00db0a9bf841", name: "Curry Leaves Rice Podi", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Traditional Karuveppilai rice podi rich in iron and essential vitamins." },
-    { id: "69a9b4131c2c00db0a9bf842", name: "Coriander Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Fragrant roasted coriander & lentil powder mix for hot rice." },
-    { id: "69a9b4151c2c00db0a9bf843", name: "Moringa Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Superfood Moringa leaf rice mix packed with essential nutrients." },
-    { id: "69a9b4251c2c00db0a9bf844", name: "Pirandai Rice Podi Mix", category: "Rice Podi Mixes", weight: "100g", price: 75, offerPrice: 70, stock: 100, description: "Medicinal Veldt Grape (Pirandai) rice mix supporting digestive wellness." },
-    { id: "6967d5e7c88a08abbf51f0ac", name: "Ultimate Wellness Combo", category: "Combos & Packs", weight: "5 Mixes Pack", price: 330, offerPrice: 330, stock: 50, description: "Value pack of all 5 signature porridge mixes (Classic, Premium, Salt & Pepper, Millet Magic & Black Rice)." }
+    // Health Mixes & Porridge
+    { 
+        id: "69a91a0c4ee07f2c99a1aea1", 
+        name: "Ragi Choco Malt", 
+        category: "Health Mixes", 
+        weight: "250g", 
+        price: 250, 
+        offerPrice: 245,
+        stock: 100, 
+        description: "Nutritious health drink mix combining Ragi (Finger Millet) with premium cocoa, brown sugar, almonds & saffron." 
+    },
+    { 
+        id: "69a9b4091c2c00db0a9bf83e", 
+        name: "Nutriminix Multi-Grain Mix", 
+        category: "Health Mixes", 
+        weight: "250g", 
+        price: 200, 
+        offerPrice: 195,
+        stock: 99, 
+        description: "Traditional 27-ingredient health mix with Kavuni black rice, samba wheat, barley & millets." 
+    },
+    { 
+        id: "69620f7e7f9c4b0e78ddbc4d", 
+        name: "Urad Health Mix - Classic", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Time-tested nourishing blend made primarily from premium black gram (Urad Dal) and samba wheat." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc50", 
+        name: "Urad Health Mix - Premium", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Formulated with black gram, ragi, Kavuni black rice, and traditional Indian rice varieties." 
+    },
+    { 
+        id: "69620f7e7f9c4b0e78ddbc4e", 
+        name: "Urad Mix - Salt n Pepper", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Savoury porridge variant infused with black pepper and cumin seeds for gut health." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc4f", 
+        name: "Urad Mix - Millet Magic", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Nutritious porridge mix crafted with black gram and a carefully balanced selection of 7 millets." 
+    },
+    { 
+        id: "69620f7f7f9c4b0e78ddbc51", 
+        name: "Black Rice Delight (Kavuni)", 
+        category: "Health Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 50, 
+        description: "Traditional black rice (Karuppu Kavuni) porridge mix rich in antioxidants and iron." 
+    },
+
+    // Idly Podi & Rice Mixes
+    { 
+        id: "69620f7f7f9c4b0e78ddbc52", 
+        name: "Idly Podi - Millet Fusion", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Nutritious millet-enriched idly podi combining lentils, 4 millets, and roasted spices." 
+    },
+    { 
+        id: "69a9b40c1c2c00db0a9bf83f", 
+        name: "Idly Podi - Traditional", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Classic South Indian idly podi made from roasted lentils, dry red chillies, and spices." 
+    },
+    { 
+        id: "69a9b40e1c2c00db0a9bf840", 
+        name: "Homestyle Paruppu Rice Podi", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Protein-rich lentil rice powder delicious with hot rice & ghee." 
+    },
+    { 
+        id: "69a9b4111c2c00db0a9bf841", 
+        name: "Curry Leaves Rice Podi", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Traditional Karuveppilai rice podi rich in iron and essential vitamins." 
+    },
+    { 
+        id: "69a9b4131c2c00db0a9bf842", 
+        name: "Coriander Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Fragrant roasted coriander & lentil powder mix for hot rice." 
+    },
+    { 
+        id: "69a9b4151c2c00db0a9bf843", 
+        name: "Moringa Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Superfood Moringa leaf rice mix packed with essential nutrients." 
+    },
+    { 
+        id: "69a9b4251c2c00db0a9bf844", 
+        name: "Pirandai Rice Podi Mix", 
+        category: "Rice Podi Mixes", 
+        weight: "100g", 
+        price: 75, 
+        offerPrice: 70,
+        stock: 100, 
+        description: "Medicinal Veldt Grape (Pirandai) rice mix supporting digestive wellness." 
+    },
+
+    // Combos & Value Packs
+    { 
+        id: "6967d5e7c88a08abbf51f0ac", 
+        name: "Ultimate Wellness Combo", 
+        category: "Combos & Packs", 
+        weight: "5 Mixes Pack", 
+        price: 330, 
+        offerPrice: 330,
+        stock: 50, 
+        description: "Value pack of all 5 signature porridge mixes (Classic, Premium, Salt & Pepper, Millet Magic & Black Rice)." 
+    }
 ];
 
-// --- Live Database Query Helpers ---
-
-function formatDbProduct(p) {
-    const categoryName = (p.category && p.category.name) ? p.category.name : (typeof p.category === 'string' ? p.category : 'Health Mixes');
-    const firstVariant = (p.variants && p.variants.length > 0) ? p.variants[0] : null;
-    const effectiveWeight = p.weight || (firstVariant ? firstVariant.weight : '100g');
-    const effectivePrice = p.price || (firstVariant ? firstVariant.price : 100);
-    const effectiveOfferPrice = p.offerPrice || (firstVariant && firstVariant.offerPrice ? firstVariant.offerPrice : effectivePrice);
-
-    return {
-        id: p._id ? p._id.toString() : (p.id || "69620f7e7f9c4b0e78ddbc4d"),
-        name: p.name || 'Mansara Product',
-        category: categoryName,
-        weight: effectiveWeight,
-        price: effectivePrice,
-        offerPrice: effectiveOfferPrice,
-        stock: typeof p.stock === 'number' ? p.stock : 50,
-        description: p.description || p.short_description || 'Authentic traditional food product',
-        image: p.image || BANNER_IMAGE_URL
-    };
-}
-
-async function fetchLiveProducts() {
-    try {
-        const dbProducts = await ProductModel.find({ isActive: { $ne: false } }).populate('category').lean();
-        if (dbProducts && dbProducts.length > 0) {
-            return dbProducts.map(formatDbProduct);
-        }
-    } catch (err) {
-        console.error('[DB Products Error]:', err.message);
-    }
-    return PRODUCTS;
-}
-
-async function fetchLiveCategories() {
-    try {
-        const dbCategories = await CategoryModel.find({ isActive: { $ne: false } }).sort({ order: 1, name: 1 }).lean();
-        if (dbCategories && dbCategories.length > 0) {
-            return dbCategories.map(c => ({ id: c._id.toString(), name: c.name, description: c.description || '' }));
-        }
-    } catch (err) {
-        console.error('[DB Categories Error]:', err.message);
-    }
-    return [
-        { id: "cat_health", name: "Health Mixes", description: "Ragi Choco, Nutriminix & Urad Porridge" },
-        { id: "cat_podi", name: "Rice Podi Mixes", description: "Idly Podi, Paruppu, Curry Leaves & Moringa Podi" },
-        { id: "cat_combos", name: "Combos & Packs", description: "Ultimate Wellness Combo Pack" }
-    ];
-}
-
-async function fetchLiveProductsByCategory(categoryName) {
-    const allProducts = await fetchLiveProducts();
-    if (!categoryName || categoryName === 'All' || categoryName === 'Top') {
-        return allProducts;
-    }
-    const cleanCat = categoryName.toLowerCase().trim();
-    return allProducts.filter(p => p.category.toLowerCase().includes(cleanCat) || cleanCat.includes(p.category.toLowerCase()));
-}
-
-async function fetchLiveProductById(productId) {
-    const allProducts = await fetchLiveProducts();
-    const found = allProducts.find(p => p.id === productId || p.id === productId.replace('prod_', ''));
-    return found || allProducts[0];
-}
-
-async function searchLiveProducts(searchTerm) {
-    const term = (searchTerm || '').toLowerCase().trim();
-    if (!term) return [];
-    try {
-        const dbMatches = await ProductModel.find({
-            isActive: { $ne: false },
-            $or: [
-                { name: { $regex: term, $options: 'i' } },
-                { description: { $regex: term, $options: 'i' } },
-                { short_description: { $regex: term, $options: 'i' } },
-                { ingredients: { $regex: term, $options: 'i' } }
-            ]
-        }).populate('category').lean();
-
-        if (dbMatches && dbMatches.length > 0) {
-            return dbMatches.map(formatDbProduct);
-        }
-    } catch (err) {
-        console.error('[DB Search Error]:', err.message);
-    }
-    const allProducts = await fetchLiveProducts();
-    return allProducts.filter(p => p.name.toLowerCase().includes(term) || p.category.toLowerCase().includes(term) || p.description.toLowerCase().includes(term));
-}
-
-async function saveOrderToDatabase(orderData, contact) {
-    try {
-        const cleanPhone = (contact.phone || '').replace(/\D/g, '');
-        let dbUser = await UserModel.findOne({
-            $or: [
-                { phone: cleanPhone },
-                { whatsapp: cleanPhone },
-                { phone: `91${cleanPhone}` },
-                { whatsapp: `91${cleanPhone}` }
-            ]
-        });
-
-        if (!dbUser) {
-            dbUser = new UserModel({
-                name: contact.name || `WhatsApp User ${cleanPhone.slice(-4)}`,
-                email: `${cleanPhone}@mansarafoods.com`,
-                phone: cleanPhone,
-                whatsapp: cleanPhone,
-                authProvider: 'local'
-            });
-            await dbUser.save().catch(e => console.warn('[DB User Save Warning]:', e.message));
-        }
-
-        const dbItems = (orderData.items || []).map(item => {
-            const isValidId = item.productId && mongoose.Types.ObjectId.isValid(item.productId);
-            return {
-                product: isValidId ? new mongoose.Types.ObjectId(item.productId) : new mongoose.Types.ObjectId("69620f7e7f9c4b0e78ddbc4d"),
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-                weight: item.weight || '100g'
-            };
-        });
-
-        const newDbOrder = new OrderModel({
-            orderId: orderData.orderId,
-            user: dbUser ? dbUser._id : new mongoose.Types.ObjectId("69620f7e7f9c4b0e78ddbc4d"),
-            total: orderData.total,
-            paymentStatus: orderData.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
-            orderStatus: 'Ordered',
-            items: dbItems,
-            deliveryAddress: {
-                firstName: contact.name || 'WhatsApp Customer',
-                street: contact.address || 'WhatsApp Delivery Address',
-                city: 'Chennai',
-                state: 'Tamil Nadu',
-                zip: '600001',
-                phone: cleanPhone
-            }
-        });
-
-        await newDbOrder.save();
-        console.log(`✅ Saved Order ${orderData.orderId} to MongoDB Order collection`);
-
-        // Decrement Product Stock in DB
-        for (const item of orderData.items) {
-            if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
-                const updatedProd = await ProductModel.findByIdAndUpdate(
-                    item.productId,
-                    { $inc: { stock: -item.quantity } },
-                    { new: true }
-                );
-                if (updatedProd && updatedProd.stock <= 5) {
-                    const adminPhone = process.env.ADMIN_PHONE || '918838887064';
-                    const stockAlertText = updatedProd.stock <= 0
-                        ? `🚨 *OUT OF STOCK ALERT!* ❌\n\nProduct: *${updatedProd.name}*\nStock: *0 items*\n\nPlease restock immediately on website backend!`
-                        : `⚠️ *LOW STOCK ALERT!* 📦\n\nProduct: *${updatedProd.name}*\nStock: *${updatedProd.stock} items remaining*`;
-                    await sendMessage(adminPhone, stockAlertText).catch(e => console.error(e));
-                }
-            }
-        }
-    } catch (err) {
-        console.error('[DB Order Save Error]:', err.message);
-    }
-}
-
-async function fetchCrossChannelOrders(phone) {
-    const cleanPhone = (phone || '').replace(/\D/g, '');
-    const phoneSuffix = cleanPhone.slice(-10);
-    const mergedOrders = [];
-
-    try {
-        const contact = await Contact.findOne({ phone });
-        if (contact && contact.orders && contact.orders.length > 0) {
-            contact.orders.forEach(o => {
-                mergedOrders.push({
-                    orderId: o.orderId,
-                    items: o.items,
-                    total: o.total,
-                    status: o.status,
-                    paymentStatus: o.paymentStatus,
-                    trackingLink: o.trackingLink || `https://mansarafoods.com/order-tracking/${o.orderId}`,
-                    createdAt: o.createdAt || new Date(),
-                    source: 'WhatsApp'
-                });
-            });
-        }
-    } catch (e) {
-        console.warn('[Contact Orders Fetch Warning]:', e.message);
-    }
-
-    try {
-        const webOrders = await OrderModel.find({
-            $or: [
-                { 'deliveryAddress.phone': new RegExp(phoneSuffix, 'i') },
-                { 'deliveryAddress.phone': cleanPhone }
-            ]
-        }).sort({ date: -1 }).lean();
-
-        if (webOrders && webOrders.length > 0) {
-            webOrders.forEach(o => {
-                if (!mergedOrders.some(existing => existing.orderId.toUpperCase() === o.orderId.toUpperCase())) {
-                    mergedOrders.push({
-                        orderId: o.orderId,
-                        items: (o.items || []).map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
-                        total: o.total,
-                        status: o.orderStatus || 'Placed',
-                        paymentStatus: o.paymentStatus || 'Pending',
-                        trackingLink: `https://mansarafoods.com/order-tracking/${o.orderId}`,
-                        createdAt: o.date || o.createdAt || new Date(),
-                        source: 'Website'
-                    });
-                }
-            });
-        }
-    } catch (e) {
-        console.warn('[Website Orders Fetch Warning]:', e.message);
-    }
-
-    mergedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return mergedOrders;
-}
-
-async function getAdminStoreMetrics() {
-    try {
-        const totalProducts = await ProductModel.countDocuments();
-        const lowStockProducts = await ProductModel.find({ stock: { $lte: 5 } }).lean();
-        const outOfStockCount = lowStockProducts.filter(p => p.stock <= 0).length;
-
-        const totalOrdersCount = await OrderModel.countDocuments();
-        const pendingOrders = await OrderModel.find({ orderStatus: { $in: ['Ordered', 'Processing', 'Placed'] } }).sort({ date: -1 }).lean();
-        
-        const allOrders = await OrderModel.find({ paymentStatus: 'Paid' }).lean();
-        const totalRevenue = allOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const todayOrders = await OrderModel.find({ date: { $gte: startOfToday } }).lean();
-        const todaySales = todayOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-
-        const totalContacts = await Contact.countDocuments();
-        const optedInContacts = await Contact.countDocuments({ consent: true });
-        const openTicketsCount = await Contact.aggregate([
-            { $unwind: "$tickets" },
-            { $match: { "tickets.status": "Open" } },
-            { $count: "openCount" }
-        ]);
-
-        return {
-            totalProducts,
-            outOfStockCount,
-            lowStockCount: lowStockProducts.length,
-            lowStockItems: lowStockProducts.map(p => `${p.name} (${p.stock} left)`),
-            totalOrdersCount,
-            pendingOrdersCount: pendingOrders.length,
-            pendingOrdersList: pendingOrders.slice(0, 5),
-            totalRevenue,
-            todaySales,
-            todayOrdersCount: todayOrders.length,
-            totalContacts,
-            optedInContacts,
-            openTickets: openTicketsCount[0] ? openTicketsCount[0].openCount : 0
-        };
-    } catch (e) {
-        console.error('[Admin Metrics Error]:', e.message);
-        return {
-            totalProducts: 20,
-            outOfStockCount: 0,
-            lowStockCount: 0,
-            lowStockItems: [],
-            totalOrdersCount: 29,
-            pendingOrdersCount: 3,
-            pendingOrdersList: [],
-            totalRevenue: 15400,
-            todaySales: 1250,
-            todayOrdersCount: 4,
-            totalContacts: 76,
-            optedInContacts: 68,
-            openTickets: 1
-        };
-    }
-}
-
+// --- Helper to check target number 7904441760 ---
 function isTargetNumber(phone) {
     if (!phone) return false;
     const cleanPhone = phone.toString().replace(/\D/g, '');
     return cleanPhone.endsWith('7904441760');
 }
 
-function normalizePhone(phone) {
-    if (!phone) return '';
-    const clean = phone.toString().replace(/\D/g, '');
-    if (clean.length === 10) return '91' + clean;
-    return clean;
-}
-
 // --- Send Message Functions ---
 async function sendMessage(to, text) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    const target = normalizePhone(to);
     try {
         await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-            data: { messaging_product: 'whatsapp', to: target, type: 'text', text: { body: text } }
+            data: { messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } }
         });
     } catch (error) {
         console.error("Error sending message:", error.response ? error.response.data : error.message);
@@ -478,7 +280,6 @@ async function sendMessage(to, text) {
 
 async function sendImageMessage(to, imageUrl, captionText = "") {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    const target = normalizePhone(to);
     try {
         await axios({
             method: 'POST',
@@ -486,7 +287,7 @@ async function sendImageMessage(to, imageUrl, captionText = "") {
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
             data: {
                 messaging_product: 'whatsapp',
-                to: target,
+                to: to,
                 type: 'image',
                 image: {
                     link: imageUrl,
@@ -501,8 +302,10 @@ async function sendImageMessage(to, imageUrl, captionText = "") {
 }
 
 async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = null) {
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    const target = normalizePhone(to);
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        console.error('[sendInteractiveButtons] Missing PHONE_NUMBER_ID or ACCESS_TOKEN');
+        return;
+    }
 
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
@@ -529,42 +332,41 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray, imageUrl = nul
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
             data: {
                 messaging_product: 'whatsapp',
-                to: target,
+                to: to,
                 type: 'interactive',
                 interactive: interactiveData
             }
         });
+        console.log(`[sendInteractiveButtons] OK (with header image: ${!!imageUrl}) → ${to}`);
     } catch (error) {
-        console.error(`[sendInteractiveButtons] FAILED → ${target}:`, error.response ? error.response.data : error.message);
+        const detail = error.response ? JSON.stringify(error.response.data) : error.message;
+        console.error(`[sendInteractiveButtons] FAILED → ${to}:`, detail);
+
+        // Fallback: If header image inside interactive message fails, send image first separately, wait 1200ms, then send buttons
         if (imageUrl) {
+            console.log(`[sendInteractiveButtons] Attempting fallback: image first then text buttons...`);
+            await sendImageMessage(to, imageUrl).catch(e => console.error('[Fallback image error]:', e.message));
+            await new Promise(resolve => setTimeout(resolve, 1200));
             delete interactiveData.header;
-            try {
-                await axios({
-                    method: 'POST',
-                    url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
-                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-                    data: {
-                        messaging_product: 'whatsapp',
-                        to: target,
-                        type: 'interactive',
-                        interactive: interactiveData
-                    }
-                });
-                return;
-            } catch (e2) {
-                console.warn('[sendInteractiveButtons] Plain interactive fallback failed:', e2.response ? e2.response.data : e2.message);
-            }
+            await axios({
+                method: 'POST',
+                url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+                headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+                data: {
+                    messaging_product: 'whatsapp',
+                    to: to,
+                    type: 'interactive',
+                    interactive: interactiveData
+                }
+            }).catch(e => console.error('[Fallback text error]:', e.message));
         }
-        // Fallback: Send direct text message so notification is delivered directly to customer's WhatsApp inbox!
-        const textWithButtons = bodyText + "\n\n" + buttonsArray.map(b => `• *${b.title}*`).join('\n');
-        await sendMessage(target, textWithButtons).catch(e3 => console.error('[sendTextFallback] FAILED:', e3.message));
     }
 }
 
 async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl = null, headerText = "Mansara Foods") {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    const target = normalizePhone(to);
 
+    // Sanitize sections & rows to strictly enforce Meta Graph API length limits (Max 24 chars for titles)
     const sanitizedSections = (sections || []).map(sec => ({
         title: (sec.title || '').substring(0, 24),
         rows: (sec.rows || []).map(row => ({
@@ -602,34 +404,35 @@ async function sendInteractiveList(to, bodyText, buttonText, sections, imageUrl 
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
             data: {
                 messaging_product: 'whatsapp',
-                to: target,
+                to: to,
                 type: 'interactive',
                 interactive: interactiveData
             }
         });
     } catch (error) {
         console.error("Error sending list:", error.response ? error.response.data : error.message);
-        let listText = bodyText + "\n\n";
-        sections.forEach(sec => {
-            listText += `*${sec.title}*\n`;
-            sec.rows.forEach(r => {
-                listText += `• *${r.title}* ${r.description ? `(${r.description})` : ''}\n`;
-            });
-            listText += "\n";
-        });
-        await sendMessage(target, listText).catch(e => console.error('[sendListTextFallback] FAILED:', e.message));
+        if (imageUrl) {
+            await sendImageMessage(to, imageUrl);
+            await sendInteractiveList(to, bodyText, buttonText, sections);
+        }
     }
 }
 
+// --- Lead Scoring ---
 function calculateLeadScore(contact) {
     let score = 0;
+    // Base score on orders count
     score += (contact.orders ? contact.orders.length * 20 : 0);
+    // Base score on loyalty points
     score += Math.min(contact.loyaltyPoints || 0, 50);
+    // Base score on opt-in
     if (contact.consent) score += 20;
+    // Base score on active cart items
     if (contact.cart && contact.cart.length > 0) score += 15;
     return score;
 }
 
+// --- Multilingual Bot Messages Dictionary ---
 const MESSAGES = {
     en: {
         welcome: "🌿 *Welcome to Mansara Foods!* 🌿\n\nPure, Traditional, and Healthy Food Products (Health Mixes, Rice Mix Podis & Herbal Foods) delivered directly to your doorstep.\n\n🏆 Traditional & Natural Recipes\n✅ Homestyle Quality & Authentic Taste\n✅ Zero Preservatives or Chemicals\n✅ PAN India Fast Delivery\n\nDo you consent to receive order updates, catalog details, and special offers from us on WhatsApp? (WhatsApp Policy Compliance)\n\n1️⃣ Yes, I agree & opt-in\n2️⃣ No, continue as Guest",
@@ -675,12 +478,14 @@ const MESSAGES = {
     }
 };
 
-// --- Chatbot Main Logic ---
+// --- Chatbot Logic ---
 async function handleBotReply(phone, messageText, contact) {
 
+    // Admin Status Command Interceptor (from Admin WhatsApp 918838887064 or button clicks)
     const isAdminCmd = await handleAdminCommand(phone, messageText);
     if (isAdminCmd) return;
 
+    // Target number 7904441760 special rule: if not paused, auto-consent and allow multi-use & multi-sending
     if (isTargetNumber(phone) && !contact.is_paused) {
         if (contact.consent !== true) {
             contact.consent = true;
@@ -692,41 +497,10 @@ async function handleBotReply(phone, messageText, contact) {
     const lang = contact.language || 'en';
     const t = MESSAGES[lang] || MESSAGES.en;
 
-    // --- Product Review Rating Handler ---
-    if (msg.startsWith('rate_') || (contact.step === 'feedback_pending' && ['5', '4', '3', '2', '1'].includes(msg))) {
-        let stars = 5;
-        if (msg === 'rate_5_stars' || msg === '5') stars = 5;
-        else if (msg === 'rate_4_stars' || msg === '4') stars = 4;
-        else if (msg === 'rate_3_stars' || ['1', '2', '3'].includes(msg)) stars = 3;
-
-        contact.step = 'main_menu';
-        contact.lead_status = "Feedback Received";
-        await contact.save();
-
-        if (stars >= 4) {
-            const thankYouMsg = lang === 'en'
-                ? `🎉 *Thank you for your ${stars}-Star Review!* ⭐⭐⭐⭐⭐\n\nWe are thrilled you enjoyed your organic food products from Mansara Foods! 🌿\n\n🎁 Use coupon code *THANKYOU10* to get *10% OFF* your next purchase!`
-                : `🎉 *உங்கள் ${stars}-நட்சத்திர மதிப்பாய்வுக்கு நன்றி!* ⭐⭐⭐⭐⭐\n\nமன்சரா ஃபுட்ஸின் இயற்கை உணவுகளை நீங்கள் ரசித்ததில் நாங்கள் மகிழ்ச்சியடைகிறோம்! 🌿\n\n🎁 உங்கள் அடுத்த ஆர்டரில் 10% தள்ளுபடி பெற *THANKYOU10* கியூபொனை பயன்படுத்தவும்!`;
-            
-            await sendInteractiveButtons(phone, thankYouMsg, [
-                { id: "opt_1_shop", title: lang === 'en' ? "Shop Again 🛍️" : "மீண்டும் வாங்க 🛍️" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
-            ]);
-        } else {
-            const feedbackCareMsg = lang === 'en'
-                ? `🙏 *Thank you for your feedback.*\n\nWe are sorry to hear your experience wasn't perfect. Our customer support team would love to make it right for you!`
-                : `🙏 *உங்கள் கருத்திற்கு நன்றி.*\n\nஎங்கள் சேவை உங்களுக்கு முழு திருப்தி அளிக்காததற்கு வருந்துகிறோம். எங்கள் வாடிக்கையாளர் ஆதரவு குழு உங்களுக்கு உதவ தயாராக உள்ளது!`;
-            
-            await sendInteractiveButtons(phone, feedbackCareMsg, [
-                { id: "btn_human", title: lang === 'en' ? "Talk to Agent 🎧" : "எஜென்ட்டிடம் பேச 🎧" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
-            ]);
-        }
-        return;
-    }
-
+    // Keywords that always restart the bot (even if paused by human takeover)
     const isRestartKeyword = ['hi', 'hello', 'hey', 'menu', 'main menu', 'restart', 'start', 'btn_menu', 'hi!', '0'].includes(msg) || msg === '0';
 
+    // If bot is paused (human takeover), only allow restart keywords through
     if (contact.is_paused) {
         if (isRestartKeyword) {
             contact.is_paused = false;
@@ -734,9 +508,11 @@ async function handleBotReply(phone, messageText, contact) {
             await contact.save();
             await sendMainMenu(phone, contact);
         }
+        // All other messages silently dropped while agent is active
         return;
     }
 
+    // Compliance Check: Opt-out (STOP) / Opt-in (START)
     if (msg === 'stop' || msg === 'unsubscribe') {
         contact.consent = false;
         contact.step = 'opt_out';
@@ -759,6 +535,7 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
+    // Human Takeover / Live Agent Request
     if (msg === "6" || msg === "btn_human" || msg.includes("human") || msg.includes("agent") || msg.includes("talk to someone")) {
         contact.is_paused = true;
         contact.step = 'human_takeover';
@@ -776,6 +553,7 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
+    // --- ONBOARDING FLOW: CONSENT ---
     if (contact.consent === null && contact.step !== 'consent_pending') {
         contact.step = 'consent_pending';
         await contact.save();
@@ -810,6 +588,7 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
+    // --- ONBOARDING FLOW: LANGUAGE ---
     if (contact.step === 'language_selection') {
         if (msg === '1' || msg === 'btn_lang_en' || msg.includes('english')) {
             contact.language = 'en';
@@ -829,48 +608,45 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
+    // Greeting check — show main menu
     if (isRestartKeyword) {
         await sendMainMenu(phone, contact);
         return;
     }
 
-    // --- 1. MAIN MENU ROUTING ---
+
+    // --- 1. MAIN MENU ROUTING (Options 1 to 4) ---
     if (contact.step === 'main_menu' || msg.startsWith('opt_')) {
+        // Option 1: Shop Products
         if (msg === '1' || msg === '1️⃣' || msg.includes('shop') || msg === 'opt_1_shop' || msg === 'opt_1_products' || msg === 'btn_catalog') {
             await sendShopProductsMenu(phone, contact);
             return;
         }
+        // Option 2: Orders
         if (msg === '2' || msg === '2️⃣' || msg.includes('order') || msg === 'opt_2_orders' || msg === 'opt_2_order') {
             await sendOrdersMenu(phone, contact);
             return;
         }
+        // Option 3: Business (Dealers & Bulk Orders)
         if (msg === '3' || msg === '3️⃣' || msg.includes('business') || msg.includes('dealer') || msg.includes('bulk') || msg === 'opt_3_business') {
             await sendBusinessMenu(phone, contact);
             return;
         }
+        // Option 4: Help & Support
         if (msg === '4' || msg === '4️⃣' || msg.includes('help') || msg.includes('support') || msg === 'opt_4_support') {
             await sendSupportMenu(phone, contact);
             return;
         }
-        if (msg.includes('offer') || msg.includes('discount') || msg.includes('coupon') || msg === '6') {
-            const offerText = `🏷️ *Special Offers & Discounts* 🎁\n\n🔥 *WELCOME10*: 10% OFF on all Health Mixes\n🔥 *SAVE10*: Extra 10% OFF on Cart items!\n🔥 *FREE SHIPPING* on all orders above ₹500\n\nTap below to shop with discount:`;
-            await sendInteractiveButtons(phone, offerText, [
-                { id: "opt_1_shop", title: "Shop Products 🛍️" },
-                { id: "btn_cart", title: "View Cart 🛒" },
-                { id: "btn_menu", title: "Main Menu 🏠" }
-            ]);
-            return;
-        }
     }
 
-    // --- 2. SHOP PRODUCTS FLOW ---
+    // --- 2. SHOP PRODUCTS MENU FLOW ---
     if (contact.step === 'shop_products' || msg.startsWith('shop_')) {
         if (msg === '1' || msg === 'shop_1_categories' || msg.includes('category') || msg.includes('categories')) {
             await sendProductCategoriesMenu(phone, contact);
             return;
         }
         if (msg === '2' || msg === 'shop_2_offers' || msg.includes('offer')) {
-            const offerText = `🏷️ *Today's Special Offers*\n\n🔥 10% OFF on all Health Mixes (Code: WELCOME10)\n🔥 Buy 2 Podi Packs & Get 1 Free!\n🔥 Free Shipping on orders above ₹500`;
+            const offerText = `🏷️ *Today's Offers*\n\n🔥 10% OFF on all Health Mixes (Code: WELCOME10)\n🔥 Buy 2 Podi Packs & Get 1 Free!\n🔥 Free Shipping on orders above ₹500`;
             await sendInteractiveButtons(phone, offerText, [
                 { id: "shop_1_categories", title: "Product Categories 🥫" },
                 { id: "shop_5_back", title: "Main Menu 🏠" }
@@ -878,12 +654,7 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
         if (msg === '3' || msg === 'shop_3_arrivals' || msg.includes('new') || msg.includes('arrival')) {
-            const allProds = await fetchLiveProducts();
-            const topNew = allProds.slice(0, 3);
-            let newText = `✨ *New Arrivals & Featured Products*\n\n`;
-            topNew.forEach((p, i) => {
-                newText += `${i + 1}. 🌾 ${p.name} (${p.weight} - ₹${p.price})\n`;
-            });
+            const newText = `✨ *New Arrivals*\n\n1. 🌾 Kavuni Black Rice Porridge Mix (250g - ₹220)\n2. 🍋 Lemon Pickle (500g - ₹180)\n3. 🍫 Ragi Choco Malt (250g - ₹250)`;
             await sendInteractiveButtons(phone, newText, [
                 { id: "shop_1_categories", title: "Product Categories 🥫" },
                 { id: "shop_5_back", title: "Main Menu 🏠" }
@@ -930,11 +701,14 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
-        const items = await fetchLiveProductsByCategory(contact.selectedCategory || 'All');
+        let items = PRODUCTS;
+        if (contact.selectedCategory && contact.selectedCategory !== "All") {
+            items = PRODUCTS.filter(p => p.category === contact.selectedCategory);
+        }
 
         if (msg.startsWith('item_select_')) {
             const prodId = msg.replace('item_select_', '');
-            const selectedProd = await fetchLiveProductById(prodId);
+            const selectedProd = PRODUCTS.find(p => p.id === prodId);
             if (selectedProd) {
                 await sendProductCardView(phone, selectedProd, contact);
                 return;
@@ -954,18 +728,20 @@ async function handleBotReply(phone, messageText, contact) {
         }
     }
 
-    // --- 5. INDIVIDUAL PRODUCT ACTIONS ---
+    // --- 5. INDIVIDUAL PRODUCT ITEM ACTIONS ---
     if (contact.step === 'product_item_view' || msg.startsWith('prod_action_')) {
-        const selectedProd = await fetchLiveProductById(contact.selectedProductId);
+        const selectedProd = PRODUCTS.find(p => p.id === contact.selectedProductId) || PRODUCTS[0];
+        const icon = selectedProd.category === 'Pickles' ? '🍋' : selectedProd.category === 'Oils & Ghee' ? '🧈' : selectedProd.category === 'Snacks' ? '🥨' : selectedProd.category === 'Masala Powders' ? '🌶️' : '🥣';
 
+        // 1. View Details
         if (msg === '1' || msg === 'prod_action_details' || msg.includes('detail')) {
-            const stockStatus = selectedProd.stock > 5 ? 'Available (In Stock)' : selectedProd.stock > 0 ? `Low Stock (${selectedProd.stock} left)` : 'Out of Stock';
-            const detailsText = `ℹ️ *${selectedProd.name} Details*\n\n${selectedProd.description}\n\nWeight: ${selectedProd.weight}\nPrice: ₹${selectedProd.price}\nStock: ${stockStatus}`;
+            const detailsText = `ℹ️ *${selectedProd.name} Details*\n\n${selectedProd.description}\n\nWeight: ${selectedProd.weight}\nPrice: ₹${selectedProd.price}\nStock: Available`;
             await sendMessage(phone, detailsText);
             await sendProductCardView(phone, selectedProd, contact);
             return;
         }
 
+        // 2. Add to Cart
         if (msg === '2' || msg === 'prod_action_add' || msg.includes('add')) {
             const existingItem = contact.cart.find(item => item.productId === selectedProd.id);
             if (existingItem) {
@@ -973,7 +749,6 @@ async function handleBotReply(phone, messageText, contact) {
             } else {
                 contact.cart.push({ productId: selectedProd.id, name: selectedProd.name, price: selectedProd.price, quantity: 1 });
             }
-            contact.funnelState = 'cart';
             await contact.save();
 
             const addedMsg = `🛒 Added *${selectedProd.name} (${selectedProd.weight})* to your cart!\nTotal Cart Items: ${contact.cart.length}`;
@@ -985,13 +760,13 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
+        // 3. Buy Now
         if (msg === '3' || msg === 'prod_action_buy' || msg.includes('buy')) {
             const existingItem = contact.cart.find(item => item.productId === selectedProd.id);
             if (!existingItem) {
                 contact.cart.push({ productId: selectedProd.id, name: selectedProd.name, price: selectedProd.price, quantity: 1 });
             }
             contact.step = 'checkout_address';
-            contact.funnelState = 'checkout';
             await contact.save();
 
             const checkoutMsg = `💳 *Checkout - Shipping Details*\n\nPlease type your complete delivery address (Street, City, Pincode):`;
@@ -999,6 +774,7 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
 
+        // 4. Back → return to full product list
         if (msg === '4' || msg === 'prod_action_back' || msg === 'back' || msg.includes('back')) {
             await sendShopProductsMenu(phone, contact);
             return;
@@ -1012,10 +788,9 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
         if (msg === '2' || msg === 'orders_2_track' || msg.includes('track')) {
-            const userOrders = await fetchCrossChannelOrders(phone);
-            if (userOrders.length > 0) {
-                const lastOrder = userOrders[0];
-                const trackMsg = `📦 *Order Tracking*\n\nOrder ID: *${lastOrder.orderId}*\nStatus: *${lastOrder.status}*\nPayment: *${lastOrder.paymentStatus}*\nTotal: ₹${lastOrder.total}\nTracking Link: ${lastOrder.trackingLink}`;
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
+                const trackMsg = `📦 *Order Tracking*\n\nOrder ID: *${lastOrder.orderId}*\nStatus: *${lastOrder.status}*\nPayment: *${lastOrder.paymentStatus}*\nTotal: ₹${lastOrder.total}\nTracking Link: ${lastOrder.trackingLink || 'https://track.shiprocket.in/mansarafoods/' + lastOrder.orderId}`;
                 await sendInteractiveButtons(phone, trackMsg, [
                     { id: "orders_6_back", title: "Orders Menu 📦" },
                     { id: "btn_menu", title: "Main Menu 🏠" }
@@ -1027,14 +802,12 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
         if (msg === '3' || msg === 'orders_3_reorder' || msg.includes('reorder')) {
-            const userOrders = await fetchCrossChannelOrders(phone);
-            if (userOrders.length > 0) {
-                const lastOrder = userOrders[0];
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
                 lastOrder.items.forEach(i => {
-                    contact.cart.push({ productId: i.productId || "69620f7e7f9c4b0e78ddbc4d", name: i.name, price: i.price, quantity: i.quantity });
+                    contact.cart.push({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity });
                 });
                 contact.step = 'checkout_address';
-                contact.funnelState = 'checkout';
                 await contact.save();
                 await sendMessage(phone, `🔄 Added items from Order *${lastOrder.orderId}* to your cart!\n\nPlease type your delivery address to proceed with reorder:`);
             } else {
@@ -1044,10 +817,9 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
         if (msg === '4' || msg === 'orders_4_history' || msg.includes('history')) {
-            const userOrders = await fetchCrossChannelOrders(phone);
-            if (userOrders.length > 0) {
-                let historyText = `📜 *Cross-Channel Order History*\n\n`;
-                userOrders.forEach((o, idx) => {
+            if (contact.orders && contact.orders.length > 0) {
+                let historyText = `📜 *Order History*\n\n`;
+                contact.orders.forEach((o, idx) => {
                     historyText += `${idx + 1}. *${o.orderId}* - ₹${o.total} (${o.status})\nDate: ${new Date(o.createdAt).toLocaleDateString()}\n\n`;
                 });
                 await sendInteractiveButtons(phone, historyText, [
@@ -1061,9 +833,8 @@ async function handleBotReply(phone, messageText, contact) {
             return;
         }
         if (msg === '5' || msg === 'orders_5_payment' || msg.includes('payment')) {
-            const userOrders = await fetchCrossChannelOrders(phone);
-            if (userOrders.length > 0) {
-                const lastOrder = userOrders[0];
+            if (contact.orders && contact.orders.length > 0) {
+                const lastOrder = contact.orders[contact.orders.length - 1];
                 const payMsg = `💳 *Payment Status*\n\nOrder ID: *${lastOrder.orderId}*\nAmount: ₹${lastOrder.total}\nPayment Method: ${lastOrder.paymentStatus}\nStatus: ${lastOrder.paymentStatus === 'Paid' ? '✅ Paid' : lastOrder.paymentStatus === 'COD' ? '💵 Cash on Delivery' : '⏳ Pending'}`;
                 await sendInteractiveButtons(phone, payMsg, [
                     { id: "orders_6_back", title: "Orders Menu 📦" },
@@ -1187,16 +958,37 @@ async function handleBotReply(phone, messageText, contact) {
         }
     }
 
-    // --- ADD TO CART & CHECKOUT HANDLING ---
+    // --- PROCESS CATALOG CATEGORY SELECTIONS ---
+    if (msg.startsWith('cat_') || ['health mixes', 'rice mixes', 'podi', 'combos'].includes(msg)) {
+        let category = '';
+        if (msg === 'cat_health_mixes' || msg.includes('health')) category = 'Health Mixes';
+        else if (msg === 'cat_rice_podi' || msg.includes('podi') || msg.includes('rice')) category = 'Rice Mixes & Podi';
+        else if (msg === 'cat_combos' || msg.includes('combo')) category = 'Combos & Packs';
+
+        if (category) {
+            await sendCategoryProducts(phone, category, contact);
+            return;
+        }
+    }
+
+    // Handle catalog navigation menu numbers
+    if (contact.step === 'catalog_menu') {
+        if (msg === '1') { await sendCategoryProducts(phone, 'Health Mixes', contact); return; }
+        if (msg === '2') { await sendCategoryProducts(phone, 'Rice Mixes & Podi', contact); return; }
+        if (msg === '3') { await sendCategoryProducts(phone, 'Combos & Packs', contact); return; }
+        if (msg === '4') { contact.step = 'main_menu'; await contact.save(); await sendMainMenu(phone, contact); return; }
+    }
+
+    // --- ADD TO CART / WISHLIST ACTION ---
     if (msg.startsWith('add_prod_')) {
         const prodId = msg.replace('add_', '');
-        const product = await fetchLiveProductById(prodId);
+        const product = PRODUCTS.find(p => p.id === prodId);
         if (product) {
-            const existingItem = contact.cart.find(item => item.productId === product.id);
+            const existingItem = contact.cart.find(item => item.productId === prodId);
             if (existingItem) {
                 existingItem.quantity += 1;
             } else {
-                contact.cart.push({ productId: product.id, name: product.name, price: product.price, quantity: 1 });
+                contact.cart.push({ productId: prodId, name: product.name, price: product.price, quantity: 1 });
             }
             contact.funnelState = 'cart';
             await contact.save();
@@ -1214,6 +1006,24 @@ async function handleBotReply(phone, messageText, contact) {
         }
     }
 
+    if (msg.startsWith('wish_prod_')) {
+        const prodId = msg.replace('wish_', '');
+        const product = PRODUCTS.find(p => p.id === prodId);
+        if (product) {
+            if (!contact.wishlist.includes(product.name)) {
+                contact.wishlist.push(product.name);
+                await contact.save();
+            }
+            const wishMsg = lang === 'en'
+                ? `❤️ Added *${product.name}* to your Wishlist!`
+                : `❤️ *${product.name}* உங்கள் விருப்பப் பட்டியலில் சேர்க்கப்பட்டது!`;
+            await sendMessage(phone, wishMsg);
+            await sendCategoryProducts(phone, product.category, contact);
+            return;
+        }
+    }
+
+    // --- CHECKOUT & CART MANIPULATION ---
     if (msg === 'btn_checkout' || (contact.step === 'cart_view' && msg === '1')) {
         if (contact.cart.length === 0) {
             await sendMessage(phone, t.cart_empty);
@@ -1245,10 +1055,13 @@ async function handleBotReply(phone, messageText, contact) {
         const isCod = msg === '2' || msg === 'pay_cod' || msg.includes('cod') || msg.includes('delivery');
 
         if (isOnline || isCod) {
+            // Create Order
             const subtotal = contact.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             
+            // Coupon check
             let discount = 0;
             if (contact.loyaltyPoints > 0) {
+                // Auto redeem loyalty points
                 discount = Math.min(contact.loyaltyPoints, subtotal);
                 contact.loyaltyPoints -= discount;
             }
@@ -1271,18 +1084,17 @@ async function handleBotReply(phone, messageText, contact) {
                 total,
                 status: "Placed",
                 paymentStatus: isOnline ? "Pending" : "COD",
-                trackingLink: `https://mansarafoods.com/order-tracking/${orderId}`,
+                trackingLink: `https://track.shiprocket.in/mansarafoods/${orderId}`,
                 createdAt: new Date()
             };
 
             contact.orders.push(newOrder);
-            contact.cart = [];
+            contact.cart = []; // clear cart
             contact.funnelState = 'completed';
 
-            await saveOrderToDatabase(newOrder, contact);
-
             if (isCod) {
-                const earnedPoints = Math.floor(total * 0.05);
+                // COD Flow
+                const earnedPoints = Math.floor(total * 0.05); // 5% points
                 contact.loyaltyPoints += earnedPoints;
                 contact.step = 'main_menu';
                 await contact.save();
@@ -1293,10 +1105,11 @@ async function handleBotReply(phone, messageText, contact) {
                     .replace('{points}', earnedPoints);
 
                 await sendInteractiveButtons(phone, successMsg, [
-                    { id: "orders_2_track", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
+                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
                     { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
                 ]);
 
+                // Sync CRM Lead Webhook & Notify Admin WhatsApp
                 syncCrmOrder(contact, newOrder);
                 notifyAdminNewOrder({
                     orderId: newOrder.orderId,
@@ -1309,6 +1122,7 @@ async function handleBotReply(phone, messageText, contact) {
                     paymentStatus: 'COD'
                 }).catch(err => console.error('[ADMIN NOTIFY ERROR]:', err.message));
             } else {
+                // Online Payment Flow
                 contact.step = 'payment_pending';
                 await contact.save();
 
@@ -1321,6 +1135,191 @@ async function handleBotReply(phone, messageText, contact) {
                     { id: "cancel_pending_order", title: lang === 'en' ? "Cancel Order ❌" : "ஆர்டரை ரத்து செய் ❌" }
                 ]);
             }
+            return;
+        }
+    }
+
+    if (contact.step === 'payment_pending') {
+        const lastOrder = contact.orders[contact.orders.length - 1];
+        if (msg === 'confirm_payment' || msg === 'confirm' || msg === 'pay') {
+            if (lastOrder && lastOrder.paymentStatus === 'Pending') {
+                lastOrder.paymentStatus = 'Paid';
+                const earnedPoints = Math.floor(lastOrder.total * 0.05);
+                contact.loyaltyPoints += earnedPoints;
+                contact.step = 'main_menu';
+                await contact.save();   
+
+                const successMsg = t.online_success
+                    .replace('{orderId}', lastOrder.orderId)
+                    .replace('{total}', lastOrder.total)
+                    .replace('{points}', earnedPoints);
+
+                await sendInteractiveButtons(phone, successMsg, [
+                    { id: "btn_orders", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
+                    { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+                ]);
+
+                syncCrmOrder(contact, lastOrder);
+            }
+            return;
+        }
+
+        if (msg === 'cancel_pending_order' || msg.includes('cancel')) {
+            if (lastOrder && lastOrder.paymentStatus === 'Pending') {
+                lastOrder.status = 'Cancelled';
+                // Return loyalty points if redeemed
+                if (lastOrder.discount > 0) {
+                    contact.loyaltyPoints += lastOrder.discount;
+                }
+                contact.step = 'main_menu';
+                await contact.save();
+
+                await sendMessage(phone, lang === 'en' ? "❌ Order cancelled successfully." : "❌ ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது.");
+                await sendMainMenu(phone, contact);
+                await sendMainMenu(phone, contact);
+            }
+            return;
+        }
+    }
+
+    // Apply Coupon entry
+    if (contact.step === 'cart_view' && msg === '2') {
+        contact.step = 'coupon_entry';
+        await contact.save();
+        await sendMessage(phone, t.coupon_entry || "🎟️ Enter Coupon Code (e.g. SAVE10):");
+        return;
+    }
+
+    if (contact.step === 'coupon_entry') {
+        if (msg === 'save10' || msg === 'welcome10') {
+            contact.appliedCoupon = msg.toUpperCase();
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMessage(phone, lang === 'en' ? "✅ Coupon applied! 10% discount added to your checkout total." : "✅ கியூபொன் பயன்படுத்தப்பட்டது! செக்அவுட்டில் 10% தள்ளுபடி சேர்க்கப்பட்டுள்ளது.");
+            await sendCartView(phone, contact);
+        } else {
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMessage(phone, lang === 'en' ? "❌ Invalid coupon code. Returning to cart." : "❌ தவறான கியூபொன் குறியீடு. கார்ட்டிற்கு திரும்புகிறது.");
+            await sendCartView(phone, contact);
+        }
+        return;
+    }
+
+    if (contact.step === 'cart_view' && msg === '3') {
+        contact.cart = [];
+        contact.appliedCoupon = "";
+        contact.step = 'main_menu';
+        await contact.save();
+        await sendMessage(phone, lang === 'en' ? "🗑️ Cart cleared successfully!" : "🗑️ கார்ட் வெற்றிகரமாக காலியாக்கப்பட்டது!");
+        await sendMainMenu(phone, contact);
+        return;
+    }
+
+    // --- ORDER STATUS & TRACKING MENU ---
+    if (contact.step === 'orders_menu') {
+        if (msg === '1') {
+            await sendMessage(phone, lang === 'en' ? "📝 Please type your new address or instructions:" : "📝 தயவுசெய்து உங்கள் புதிய முகவரி அல்லது குறிப்புகளை டைப் செய்யவும்:");
+            contact.step = 'reschedule_entry';
+            await contact.save();
+            return;
+        }
+        if (msg === '2') {
+            await sendMessage(phone, lang === 'en' ? "❌ Please type the Order ID you wish to cancel (e.g. ORD-123456):" : "❌ ரத்து செய்ய விரும்பும் ஆர்டர் ஐடியை டைப் செய்யவும் (எ.கா: ORD-123456):");
+            contact.step = 'cancel_entry';
+            await contact.save();
+            return;
+        }
+        if (msg === '3') {
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMainMenu(phone, contact);
+            return;
+        }
+    }
+
+    if (contact.step === 'reschedule_entry') {
+        contact.address = messageText;
+        contact.step = 'main_menu';
+        await contact.save();
+        await sendMessage(phone, lang === 'en' ? "✅ Delivery instruction received and updated in shipping system." : "✅ விநியோக குறிப்பு பெறப்பட்டு கணினியில் புதுப்பிக்கப்பட்டது.");
+        await sendMainMenu(phone, contact);
+        return;
+    }
+
+    if (contact.step === 'cancel_entry') {
+        const orderIdToCancel = messageText.toUpperCase().trim();
+        const orderToCancel = contact.orders.find(o => o.orderId === orderIdToCancel);
+        if (orderToCancel) {
+            if (orderToCancel.status === 'Placed') {
+                orderToCancel.status = 'Cancelled';
+                if (orderToCancel.discount > 0) {
+                    contact.loyaltyPoints += orderToCancel.discount;
+                }
+                contact.step = 'main_menu';
+                await contact.save();
+                await sendMessage(phone, lang === 'en' ? `✅ Order ${orderIdToCancel} has been cancelled.` : `✅ ஆர்டர் ${orderIdToCancel} ரத்து செய்யப்பட்டது.`);
+            } else {
+                contact.step = 'main_menu';
+                await contact.save();
+                await sendMessage(phone, lang === 'en' ? `❌ Cannot cancel order. Status is already ${orderToCancel.status}.` : `❌ ஆர்டரை ரத்து செய்ய முடியாது. நிலை ஏற்கனவே ${orderToCancel.status} ஆக உள்ளது.`);
+            }
+        } else {
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMessage(phone, lang === 'en' ? "❌ Order ID not found." : "❌ ஆர்டர் ஐடி கிடைக்கவில்லை.");
+        }
+        await sendMainMenu(phone, contact);
+        return;
+    }
+
+    // --- SUPPORT & FAQ MENU ---
+    if (contact.step === 'support_menu') {
+        if (msg === '1') {
+            const shipMsg = lang === 'en'
+                ? "🚚 *Shipping & Delivery:*\nWe deliver PAN India. Orders in Tamil Nadu are delivered in 2-3 business days. Rest of India takes 4-7 days. Free shipping on orders above ₹500!"
+                : "🚚 *ஷிப்பிங் மற்றும் டெலிவரி:*\nநாங்கள் இந்தியா முழுவதும் விநியோகிக்கிறோம். தமிழ்நாட்டில் 2-3 வேலை நாட்களில் டெலிவரி செய்யப்படும். மற்ற மாநிலங்களில் 4-7 நாட்கள் ஆகும். ₹500 க்கு மேல் இலவச ஷிப்பிங்!";
+            await sendMessage(phone, shipMsg);
+            await sendSupportMenu(phone, contact);
+            return;
+        }
+        if (msg === '2') {
+            const retMsg = lang === 'en'
+                ? "🔄 *Returns & Refunds:*\nIf you receive a damaged or incorrect food item, report it within 48 hours for a 100% free replacement or refund. We do not accept returns for opened items due to food hygiene."
+                : "🔄 *திரும்பப் பெறுதல் மற்றும் பணத்தைத் திரும்பப் பெறுதல்:*\nசேதமடைந்த பொருள் கிடைத்தால் 48 மணி நேரத்திற்குள் தெரிவிக்கவும். உணவு பாதுகாப்பு காரணமாக திறக்கப்பட்ட பொருட்கள் திரும்பப் பெறப்படாது.";
+            await sendMessage(phone, retMsg);
+            await sendSupportMenu(phone, contact);
+            return;
+        }
+        if (msg === '3') {
+            const certMsg = lang === 'en'
+                ? "🌿 *Organic Certifications:*\nAll our products are certified organic under India's National Programme for Organic Production (NPOP) and FSSAI standards. We source directly from sustainable organic farmers."
+                : "🌿 *இயற்கை சான்றிதழ்:*\nஎங்கள் பொருட்கள் அனைத்தும் NPOP மற்றும் FSSAI தரநிலைகளின்படி சான்றளிக்கப்பட்டவை.";
+            await sendMessage(phone, certMsg);
+            await sendSupportMenu(phone, contact);
+            return;
+        }
+        if (msg === '4') {
+            contact.step = 'ticket_entry';
+            await contact.save();
+            await sendMessage(phone, lang === 'en' ? "🎫 *Submit a Ticket*\n\nPlease type a description of the problem you are facing (e.g. damaged Cashews packing, delay in delivery, payment issue):" : "🎫 *டிக்கெட் சமர்ப்பிக்கவும்*\n\nஉங்கள் சிக்கலை டைப் செய்யவும் (எ.கா. சேதமடைந்த பேக்கிங், டெலிவரி தாமதம், கட்டண பிரச்சனை):");
+            return;
+        }
+        if (msg === '5') {
+            contact.is_paused = true;
+            contact.step = 'human_takeover';
+            await contact.save();
+            
+            const handoffMsg = lang === 'en'
+                ? `👋 *Connecting you to our support team!*\nAn agent will reply shortly.`
+                : `👋 *எங்கள் உதவி குழுவுடன் உங்களை இணைக்கிறோம்!*\nஒரு முகவர் விரைவில் பதிலளிப்பார்.`;
+            await sendMessage(phone, handoffMsg);
+            return;
+        }
+        if (msg === '6') {
+            contact.step = 'main_menu';
+            await contact.save();
+            await sendMainMenu(phone, contact);
             return;
         }
     }
@@ -1345,21 +1344,33 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    // --- CONVERSATIONAL SEARCH ASSISTANT ---
-    if (msg.length > 2) {
-        const matches = await searchLiveProducts(msg);
-        if (matches && matches.length > 0) {
+    // --- SEARCH / CONVERSATIONAL ASSISTANT ---
+    // If the message is not matched, let's treat it as a product search query
+    const keywords = ['oil', 'honey', 'turmeric', 'almonds', 'cookies', 'ragi', 'millet', 'spices', 'nuts', 'cashew', 'sweet', 'snack'];
+    const containsKeyword = keywords.some(k => msg.includes(k));
+    
+    if (containsKeyword || msg.length > 2) {
+        const matches = PRODUCTS.filter(p => 
+            p.name.toLowerCase().includes(msg) || 
+            p.category.toLowerCase().includes(msg) || 
+            p.description.toLowerCase().includes(msg)
+        );
+
+        if (matches.length > 0) {
             contact.step = 'main_menu';
             await contact.save();
 
             let resultsMsg = lang === 'en' 
-                ? `🔍 *Database Search Results for "${messageText}":*\n\n`
+                ? `🔍 *Search Results for "${messageText}":*\n\n`
                 : `🔍 *"${messageText}" க்கான தேடல் முடிவுகள்:*\n\n`;
 
-            matches.slice(0, 5).forEach((p, index) => {
-                const stockText = p.stock > 0 ? `Stock: ${p.stock}` : `⚠️ Out of Stock`;
-                resultsMsg += `*${index + 1}️⃣ ${p.name}* - ₹${p.price} (${stockText})\n_${p.description.slice(0, 60)}_\n👉 ID: \`add_${p.id}\` to buy\n\n`;
+            matches.forEach((p, index) => {
+                resultsMsg += `*${index + 1}️⃣ ${p.name}* - ₹${p.price}\n_${p.description}_\n👉 ID: \`add_${p.id}\` to add to cart\n\n`;
             });
+
+            resultsMsg += lang === 'en'
+                ? `_To add an item, type "add_" followed by product ID (e.g. add_prod_honey)._`
+                : `_கார்டில் சேர்க்க, \"add_\" குறியீடு மற்றும் தயாரிப்பு ஐடி தட்டச்சு செய்யவும் (எ.கா: add_prod_honey)._`;
 
             await sendInteractiveButtons(phone, resultsMsg, [
                 { id: "btn_catalog", title: lang === 'en' ? "Browse Categories" : "பிரிவுகளைக் காண்க" },
@@ -1370,7 +1381,7 @@ async function handleBotReply(phone, messageText, contact) {
         }
     }
 
-    // Fallback menu
+    // Fallback: If nothing was matched, show fallback main menu
     contact.step = 'main_menu';
     await contact.save();
     await sendInteractiveButtons(phone, t.invalid_option, [
@@ -1383,17 +1394,21 @@ async function handleBotReply(phone, messageText, contact) {
 async function sendMainMenu(phone, contact) {
     contact.step = 'main_menu';
     await contact.save();
+    console.log(`[sendMainMenu] Sending to ${phone}`);
 
     const welcomeMsg = `👋 Welcome to Mansara Foods!\n\nநாங்கள் தயாரிப்பது வெறும் பொருள் அல்ல, ஒரு குடும்பத்தின் ஆரோக்கியம்.\n\nPlease choose an option below:`;
 
+    // Send Main Welcome Card with Banner Image at the VERY TOP of the card
     await sendInteractiveButtons(phone, welcomeMsg, [
         { id: "opt_1_shop",     title: "🛍️ Shop Products" },
         { id: "opt_2_orders",   title: "📋 My Orders" },
         { id: "opt_3_business", title: "💼 Business" }
     ], BANNER_IMAGE_URL);
 
+    // Pause 800ms to preserve message order
     await new Promise(resolve => setTimeout(resolve, 800));
 
+    // Secondary Help & Support Button below main menu
     await sendInteractiveButtons(phone, "❓ Need help? We're here for you!", [
         { id: "opt_4_support", title: "🎧 Help & Support" }
     ]);
@@ -1404,15 +1419,14 @@ async function sendShopProductsMenu(phone, contact) {
     contact.selectedCategory = 'Top';
     await contact.save();
 
-    const allProds = await fetchLiveProducts();
-    const topProducts = allProds.slice(0, 8);
+    const topProducts = PRODUCTS.slice(0, 8);
     const topRows = topProducts.map((item, idx) => {
         const prefix = `${idx + 1}. `;
         const maxNameLen = 24 - prefix.length;
         return {
             id: `item_select_${item.id}`,
             title: `${prefix}${item.name.slice(0, maxNameLen)}`.substring(0, 24),
-            description: `${item.weight} – ₹${item.price} (Stock: ${item.stock})`
+            description: `${item.weight} – ₹${item.price}`
         };
     });
 
@@ -1432,7 +1446,7 @@ async function sendShopProductsMenu(phone, contact) {
 
     await sendInteractiveList(
         phone,
-        `🛒 *Shop Products*\n\nBrowse our top traditional products directly from database catalog:`,
+        `🛒 *Shop Products*\n\nBrowse our top products below:`,
         "View Products 🛍️",
         sections
     );
@@ -1443,8 +1457,7 @@ async function sendMoreProductsMenu(phone, contact) {
     contact.selectedCategory = 'More';
     await contact.save();
 
-    const allProds = await fetchLiveProducts();
-    const remainingProducts = allProds.slice(8);
+    const remainingProducts = PRODUCTS.slice(8);
     const remainingRows = remainingProducts.map((item, idx) => {
         const prefix = `${idx + 9}. `;
         const maxNameLen = 24 - prefix.length;
@@ -1477,27 +1490,32 @@ async function sendMoreProductsMenu(phone, contact) {
     );
 }
 
+
 async function sendProductCategoriesMenu(phone, contact) {
     contact.step = 'product_categories';
     await contact.save();
 
-    const liveCats = await fetchLiveCategories();
-    const rows = liveCats.map(c => ({
-        id: `cat_${c.name.toLowerCase().replace(/\s+/g, '_')}`,
-        title: `🥫 ${c.name}`.substring(0, 24),
-        description: c.description.substring(0, 70) || `Browse ${c.name}`
-    }));
-
-    rows.push({ id: "cat_all", title: "🛍️ All Products", description: "Browse complete catalog" });
-
     const sections = [
-        { title: "📁 Product Categories", rows },
-        { title: "Navigation", rows: [{ id: "cat_back", title: "🏠 Main Menu", description: "Return to main menu" }] }
+        {
+            title: "📁 Product Categories",
+            rows: [
+                { id: "cat_readymix", title: "🥣 Health Mixes", description: "Ragi Choco, Nutriminix & Urad Porridge" },
+                { id: "cat_podi", title: "🌾 Rice Podi Mixes", description: "Idly Podi, Paruppu, Curry Leaves & Moringa Podi" },
+                { id: "cat_combos", title: "🎁 Combos & Packs", description: "Ultimate Wellness Combo (5 Mixes)" },
+                { id: "cat_all", title: "🛍️ All Products", description: "Browse complete catalog" }
+            ]
+        },
+        {
+            title: "Navigation",
+            rows: [
+                { id: "cat_back", title: "🏠 Main Menu", description: "Return to main menu" }
+            ]
+        }
     ];
 
     await sendInteractiveList(
         phone,
-        `🥫 *Mansara Product Categories*\n\nPlease choose a category below:`,
+        `🥫 *Mansara Product Categories*\n\nPlease choose a category below to browse products:`,
         "Select Category 📁",
         sections
     );
@@ -1508,17 +1526,20 @@ async function sendCategoryItemsMenu(phone, category, contact) {
     contact.selectedCategory = category;
     await contact.save();
 
-    const items = await fetchLiveProductsByCategory(category);
+    let items = PRODUCTS;
+    if (category !== "All") {
+        items = PRODUCTS.filter(p => p.category === category);
+    }
 
-    const rows = items.slice(0, 9).map((item, idx) => ({
+    const rows = items.map((item, idx) => ({
         id: `item_select_${item.id}`,
         title: `${idx + 1}. ${item.name.slice(0, 18)}`.substring(0, 24),
-        description: `${item.weight} - ₹${item.price} (${item.stock > 0 ? 'In Stock' : 'Out of Stock'})`
+        description: `${item.weight} - ₹${item.price}`
     }));
 
     rows.push({
         id: "item_back",
-        title: `${rows.length + 1}. Back`,
+        title: `${items.length + 1}. Back`,
         description: "Return to Categories"
     });
 
@@ -1531,10 +1552,9 @@ async function sendProductCardView(phone, selectedProd, contact) {
     contact.step = 'product_item_view';
     await contact.save();
 
-    const icon = selectedProd.category === 'Pickles' ? '🍋' : selectedProd.category === 'Oils & Ghee' ? '🧈' : selectedProd.category === 'Snacks' ? '🥨' : '🥣';
-    const stockStatus = selectedProd.stock > 5 ? '✅ In Stock' : selectedProd.stock > 0 ? `⚠️ Low Stock (${selectedProd.stock} left)` : '❌ Out of Stock';
+    const icon = selectedProd.category === 'Pickles' ? '🍋' : selectedProd.category === 'Oils & Ghee' ? '🧈' : selectedProd.category === 'Snacks' ? '🥨' : selectedProd.category === 'Masala Powders' ? '🌶️' : '🥣';
     
-    const cardText = `${icon} *${selectedProd.name}*\n\n✅ Weight: ${selectedProd.weight}\n✅ Price: ₹${selectedProd.price}\n📦 Availability: ${stockStatus}\n\n📝 _${selectedProd.description}_\n\nPlease choose an action below:`;
+    const cardText = `${icon} *${selectedProd.name}*\n\n✅ ${selectedProd.weight}\n✅ ₹${selectedProd.price}\n\nPlease choose an action below:`;
 
     const buttons = [
         { id: "prod_action_add", title: "🛒 Add to Cart" },
@@ -1545,14 +1565,106 @@ async function sendProductCardView(phone, selectedProd, contact) {
     await sendInteractiveButtons(phone, cardText, buttons);
 }
 
+async function sendCatalogMenu(phone, contact) {
+    const lang = contact.language || 'en';
+    const t = MESSAGES[lang] || MESSAGES.en;
+    contact.step = 'catalog_menu';
+    await contact.save();
+
+    const sections = [
+        {
+            title: (lang === 'en' ? "Product Categories" : "தயாரிப்பு வகைகள்").substring(0, 24),
+            rows: [
+                { id: "cat_health_mixes", title: lang === 'en' ? "🥣 Health Mixes" : "🥣 சத்து மாவுகள்", description: "Ragi Choco Malt, Nutriminix multigrain mix" },
+                { id: "cat_rice_podi", title: lang === 'en' ? "🌾 Rice Mixes & Podi" : "🌾 சாதப் பொடிகள்", description: "Paruppu, Pirandai, Curry Leaves & Coriander Podi" },
+                { id: "cat_combos", title: lang === 'en' ? "🎁 Combos & Packs" : "🎁 சிறப்பு பேக்குகள்", description: "5-Flavor traditional rice mix podi combo pack" }
+            ]
+        },
+        {
+            title: (lang === 'en' ? "Actions" : "செயல்கள்").substring(0, 24),
+            rows: [
+                { id: "btn_menu", title: lang === 'en' ? "🏠 Main Menu" : "🏠 முதன்மை பட்டி" }
+            ]
+        }
+    ];
+
+    await sendInteractiveList(
+        phone,
+        t.catalog_menu,
+        lang === 'en' ? "View Categories" : "வகைகளைக் காண்க",
+        sections
+    );
+}
+
+async function sendCategoryProducts(phone, category, contact) {
+    const lang = contact.language || 'en';
+    const products = PRODUCTS.filter(p => p.category === category);
+    
+    let prodMsg = lang === 'en' 
+        ? `📁 *Mansara Foods - ${category}* 📁\n\n`
+        : `📁 *மன்சரா ஃபுட்ஸ் - ${category}* 📁\n\n`;
+
+    products.forEach((p, idx) => {
+        prodMsg += `*${idx + 1}️⃣ ${p.name}*\n💰 Price: ₹${p.price}\n📝 _${p.description}_\n🛒 ID: \`add_${p.id}\` to buy\n❤️ ID: \`wish_${p.id}\` to wishlist\n\n`;
+    });
+
+    prodMsg += lang === 'en'
+        ? `Type the add ID to add to cart, or click below.`
+        : `கார்டில் சேர்க்க 'add ID' தட்டச்சு செய்யவும், அல்லது கீழே கிளிக் செய்யவும்.`;
+
+    await sendInteractiveButtons(phone, prodMsg, [
+        { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் காண்க 🛒" },
+        { id: "btn_catalog", title: lang === 'en' ? "Back to Categories" : "பிரிவுகளுக்கு திரும்பவும்" },
+        { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+    ]);
+}
+
+async function sendCartView(phone, contact) {
+    const lang = contact.language || 'en';
+    const t = MESSAGES[lang] || MESSAGES.en;
+    
+    if (contact.cart.length === 0) {
+        await sendMessage(phone, t.cart_empty);
+        await sendMainMenu(phone, contact);
+        return;
+    }
+
+    contact.step = 'cart_view';
+    await contact.save();
+
+    const subtotal = contact.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    let discount = 0;
+    if (contact.appliedCoupon === "SAVE10" || contact.appliedCoupon === "WELCOME10") {
+        discount = Math.round(subtotal * 0.10);
+    }
+    const total = subtotal - discount;
+
+    let cartMsg = lang === 'en' 
+        ? `🛒 *Your Shopping Cart:*\n\n`
+        : `🛒 *உங்கள் கார்ட் விபரங்கள்:*\n\n`;
+
+    contact.cart.forEach((item, idx) => {
+        cartMsg += `*${idx + 1}. ${item.name}*\nQty: ${item.quantity} | Price: ₹${item.price} each\nSubtotal: ₹${item.price * item.quantity}\n━━━━━━━━━━━━━━━━━\n`;
+    });
+
+    cartMsg += lang === 'en'
+        ? `*Subtotal:* ₹${subtotal}\n` + (discount > 0 ? `*Coupon (${contact.appliedCoupon}):* -₹${discount}\n` : '') + `*Shipping:* FREE\n*Grand Total:* ₹${total}\n\n`
+        : `*உப-தொகை:* ₹${subtotal}\n` + (discount > 0 ? `*கியூபொன் (${contact.appliedCoupon}):* -₹${discount}\n` : '') + `*விநியோக கட்டணம்:* இலவசம்\n*மொத்த தொகை:* ₹${total}\n\n`;
+
+    await sendInteractiveButtons(phone, cartMsg, [
+        { id: "btn_checkout", title: lang === 'en' ? "Checkout 💳" : "செக்அவுட் 💳" },
+        { id: "btn_catalog", title: lang === 'en' ? "Browse Catalog 📁" : "கடைப் பட்டியல் 📁" },
+        { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+    ]);
+}
+
 async function sendOrdersMenu(phone, contact) {
     contact.step = 'orders_menu';
     await contact.save();
 
-    const userOrders = await fetchCrossChannelOrders(phone);
-
-    if (userOrders && userOrders.length > 0) {
-        const latestOrder = userOrders[0];
+    if (contact.orders && contact.orders.length > 0) {
+        const latestOrder = contact.orders[contact.orders.length - 1];
         const dateStr = latestOrder.createdAt 
             ? new Date(latestOrder.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
             : 'Recent';
@@ -1564,9 +1676,11 @@ async function sendOrdersMenu(phone, contact) {
             itemsSummary = '• Item details in order invoice';
         }
 
-        const trackingInfo = `\n🔗 *Tracking:* ${latestOrder.trackingLink}`;
+        const trackingInfo = latestOrder.trackingLink 
+            ? `\n🔗 *Tracking:* ${latestOrder.trackingLink}` 
+            : `\n🚚 *Tracking ID:* ${latestOrder.orderId}`;
 
-        const text = `📦 *My Orders (Cross-Channel Tracking)*\n\n🔹 *Your Latest Order Details:* (${latestOrder.source || 'Website'})\n🆔 *Order ID:* ${latestOrder.orderId}\n📅 *Date:* ${dateStr}\n📊 *Status:* *${latestOrder.status}* (${latestOrder.paymentStatus})\n\n🛒 *Items Purchased:*\n${itemsSummary}\n\n💰 *Total Amount:* ₹${latestOrder.total}${trackingInfo}\n\nSelect an option below:`;
+        const text = `📦 *My Orders*\n\n🔹 *Your Current Order Details:*\n🆔 *Order ID:* ${latestOrder.orderId}\n📅 *Date:* ${dateStr}\n📊 *Status:* *${latestOrder.status}* (${latestOrder.paymentStatus})\n\n🛒 *Items Purchased:*\n${itemsSummary}\n\n💰 *Total Amount:* ₹${latestOrder.total}${trackingInfo}\n\nSelect an option below:`;
 
         const buttons = [
             { id: "orders_2_track", title: "🚚 Track Order" },
@@ -1623,6 +1737,20 @@ async function sendSupportMenu(phone, contact) {
     await sendInteractiveButtons(phone, text, buttons);
 }
 
+async function sendLoyaltyInfo(phone, contact) {
+    const lang = contact.language || 'en';
+    const t = MESSAGES[lang] || MESSAGES.en;
+    contact.step = 'main_menu';
+    await contact.save();
+
+    const info = t.loyalty_info.replace(/{points}/g, contact.loyaltyPoints || 0);
+    await sendInteractiveButtons(phone, info, [
+        { id: "btn_catalog", title: lang === 'en' ? "Shop Organic 📁" : "ஆர்கானிக் கடை 📁" },
+        { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
+    ]);
+}
+
+// CRM sync for orders — only fires when CRM_LEAD_WEBHOOK env var is set
 function syncCrmOrder(contact, order) {
     if (!process.env.CRM_LEAD_WEBHOOK) return;
     axios.post(process.env.CRM_LEAD_WEBHOOK, {
@@ -1639,394 +1767,37 @@ function syncCrmOrder(contact, order) {
     .then(() => console.log(`[CRM Order Sync] Successfully synced order ${order.orderId} to CRM`))
     .catch(err => console.error(`[CRM Order Sync Error] Failed:`, err.message));
 }
-
-// --- Admin WhatsApp Control Command Handler ---
-async function handleAdminCommand(phone, messageText) {
-    const rawMsg = (messageText || '').trim();
-    const isPrimaryAdmin = isTargetNumber(phone) || phone.endsWith('8838887064') || phone === process.env.ADMIN_PHONE;
-
-    const lowerMsg = rawMsg.toLowerCase();
-    const isAdminTrigger = isPrimaryAdmin && (
-        ['admin', '/admin', 'stats', 'dashboard', 'orders', 'stock', 'leads', 'adm_menu_stats', 'adm_menu_orders', 'adm_menu_stock', 'adm_menu_leads'].includes(lowerMsg) ||
-        lowerMsg.startsWith('adm_')
-    );
-
-    if (!isAdminTrigger && !rawMsg.toUpperCase().startsWith('ORD') && !rawMsg.startsWith('adm_')) {
-        return false;
-    }
-
-    console.log(`[ADMIN CONTROL] Admin ${phone} invoked command: "${rawMsg}"`);
-
-    if (['admin', '/admin', 'dashboard'].includes(lowerMsg)) {
-        const metrics = await getAdminStoreMetrics();
-        const adminWelcome = `⚙️ *Mansara Foods - Admin WhatsApp Control Panel* 🛠️\n\n` +
-            `📊 *Store Summary:*\n` +
-            `💰 Today's Revenue: *₹${metrics.todaySales}* (${metrics.todayOrdersCount} orders)\n` +
-            `💵 Total Revenue: *₹${metrics.totalRevenue.toLocaleString()}*\n` +
-            `📦 Pending Orders: *${metrics.pendingOrdersCount}*\n` +
-            `⚠️ Low/Out of Stock Items: *${metrics.lowStockCount}*\n` +
-            `👥 Total Customers: *${metrics.totalContacts}* (${metrics.optedInContacts} opted-in)\n\n` +
-            `Please select an admin service below:`;
-
-        await sendInteractiveButtons(phone, adminWelcome, [
-            { id: "adm_menu_stats", title: "📊 Store Analytics" },
-            { id: "adm_menu_orders", title: "📦 Pending Orders" },
-            { id: "adm_menu_stock", title: "🚨 Stock Alert" }
-        ]);
-
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await sendInteractiveButtons(phone, "👥 Lead & Customer Management", [
-            { id: "adm_menu_leads", title: "👥 Customer Leads" },
-            { id: "btn_menu", title: "🏠 Customer View" }
-        ]);
-        return true;
-    }
-
-    if (lowerMsg === 'adm_menu_stats' || lowerMsg === 'stats') {
-        const m = await getAdminStoreMetrics();
-        const statsMsg = `📊 *Mansara Foods - Real-Time Store Analytics*\n\n` +
-            `💰 *Sales Performance:*\n` +
-            `• Today's Revenue: ₹${m.todaySales} (${m.todayOrdersCount} orders)\n` +
-            `• Total Lifetime Sales: ₹${m.totalRevenue.toLocaleString()}\n\n` +
-            `📦 *Order Fulfilment:*\n` +
-            `• Total Orders Processed: ${m.totalOrdersCount}\n` +
-            `• Pending Fulfillment: ${m.pendingOrdersCount}\n\n` +
-            `🥫 *Inventory & Catalog:*\n` +
-            `• Total Products Active: ${m.totalProducts}\n` +
-            `• Out of Stock Items: ${m.outOfStockCount}\n` +
-            `• Low Stock Alerts: ${m.lowStockCount}\n\n` +
-            `👥 *Customer Engagement:*\n` +
-            `• WhatsApp Contacts: ${m.totalContacts}\n` +
-            `• Opted-in Subscribers: ${m.optedInContacts}\n` +
-            `• Open Support Tickets: ${m.openTickets}`;
-
-        await sendInteractiveButtons(phone, statsMsg, [
-            { id: "adm_menu_orders", title: "📦 Pending Orders" },
-            { id: "adm_menu_stock", title: "🚨 Stock Alert" },
-            { id: "admin", title: "⚙️ Admin Menu" }
-        ]);
-        return true;
-    }
-
-    if (lowerMsg === 'adm_menu_orders' || lowerMsg === 'orders') {
-        const m = await getAdminStoreMetrics();
-        if (!m.pendingOrdersList || m.pendingOrdersList.length === 0) {
-            await sendInteractiveButtons(phone, "✅ *No Pending Orders!*\n\nAll customer orders have been processed and fulfilled.", [
-                { id: "admin", title: "⚙️ Admin Menu" }
-            ]);
-            return true;
-        }
-
-        const firstOrder = m.pendingOrdersList[0];
-        let ordersMsg = `📦 *Pending Customer Orders (${m.pendingOrdersCount})*\n\n` +
-            `*Latest Pending Order:* \`${firstOrder.orderId}\`\n` +
-            `💰 Total: ₹${firstOrder.total} (${firstOrder.paymentStatus})\n` +
-            `📍 Address: ${firstOrder.deliveryAddress?.city || 'TN'}, ${firstOrder.deliveryAddress?.zip || ''}\n\n` +
-            `Select an action button below to update status for *${firstOrder.orderId}*:`;
-
-        await sendInteractiveButtons(phone, ordersMsg, [
-            { id: `adm_Packed_${firstOrder.orderId}`, title: "Pack 📦" },
-            { id: `adm_Shipped_${firstOrder.orderId}`, title: "Ship 🚚" },
-            { id: `adm_Delivered_${firstOrder.orderId}`, title: "Deliver ✅" }
-        ]);
-        return true;
-    }
-
-    if (lowerMsg === 'adm_menu_stock' || lowerMsg === 'stock') {
-        const m = await getAdminStoreMetrics();
-        let stockMsg = `🚨 *Inventory & Stock Status Report*\n\n`;
-        if (m.lowStockItems && m.lowStockItems.length > 0) {
-            stockMsg += `*Items Requiring Restock (<= 5 items):*\n`;
-            m.lowStockItems.forEach(item => {
-                stockMsg += `• ⚠️ ${item}\n`;
-            });
-            stockMsg += `\n_Please log into website admin panel to restock items._`;
-        } else {
-            stockMsg += `✅ All products have healthy stock levels in database!`;
-        }
-
-        await sendInteractiveButtons(phone, stockMsg, [
-            { id: "adm_menu_stats", title: "📊 Analytics" },
-            { id: "admin", title: "⚙️ Admin Menu" }
-        ]);
-        return true;
-    }
-
-    if (lowerMsg === 'adm_menu_leads' || lowerMsg === 'leads') {
-        const m = await getAdminStoreMetrics();
-        const leadsMsg = `👥 *Customer & Lead Statistics*\n\n` +
-            `• Total Database Contacts: *${m.totalContacts}*\n` +
-            `• Opted-in WhatsApp Subscribers: *${m.optedInContacts}*\n` +
-            `• Open Support Tickets: *${m.openTickets}*\n\n` +
-            `_Use the bot API dashboard to trigger broadcasts or manage individual leads._`;
-
-        await sendInteractiveButtons(phone, leadsMsg, [
-            { id: "adm_menu_stats", title: "📊 Analytics" },
-            { id: "admin", title: "⚙️ Admin Menu" }
-        ]);
-        return true;
-    }
-
-    let orderId = "";
-    let newStatus = "";
-
-    if (rawMsg.startsWith('adm_')) {
-        const parts = rawMsg.split('_');
-        if (parts.length >= 3) {
-            newStatus = parts[1];
-            orderId = parts.slice(2).join('_');
-        }
-    } else {
-        const tokens = rawMsg.split(/\s+/);
-        if (tokens.length >= 2 && tokens[0].toUpperCase().startsWith('ORD')) {
-            orderId = tokens[0].toUpperCase();
-            const statusInput = tokens[1].toLowerCase();
-            if (statusInput.includes('pack')) newStatus = 'Packed';
-            else if (statusInput.includes('ship')) newStatus = 'Shipped';
-            else if (statusInput.includes('deliv')) newStatus = 'Delivered';
-            else if (statusInput.includes('canc')) newStatus = 'Cancelled';
-        }
-    }
-
-    if (orderId && newStatus) {
-        let customerPhone = "";
-        try {
-            const dbOrder = await OrderModel.findOne({ orderId: new RegExp(`^${orderId}$`, 'i') });
-            if (dbOrder) {
-                dbOrder.orderStatus = newStatus === 'Packed' ? 'Processing' : newStatus;
-                await dbOrder.save();
-                if (dbOrder.deliveryAddress && dbOrder.deliveryAddress.phone) {
-                    customerPhone = dbOrder.deliveryAddress.phone;
-                }
-            }
-
-            const contactWithOrder = await Contact.findOne({ "orders.orderId": new RegExp(`^${orderId}$`, 'i') });
-            if (contactWithOrder) {
-                const orderObj = contactWithOrder.orders.find(o => o.orderId.toUpperCase() === orderId.toUpperCase());
-                if (orderObj) {
-                    orderObj.status = newStatus;
-                    await contactWithOrder.save();
-                    if (!customerPhone) customerPhone = contactWithOrder.phone;
-                }
-            }
-
-            if (customerPhone) {
-                const trackingLink = `https://mansarafoods.com/order-tracking/${orderId}`;
-                await notifyCustomerOrderStatus(customerPhone, orderId, newStatus, trackingLink).catch(e => console.error(e));
-            }
-
-            const confirmMsg = `✅ *Order Status Updated Successfully!*\n\n📦 *Order ID:* ${orderId}\n🔄 *New Status:* ${newStatus}\n👤 *Customer Notified:* ${customerPhone || 'Via System'}`;
-            await sendInteractiveButtons(phone, confirmMsg, [
-                { id: "adm_menu_orders", title: "📦 Pending Orders" },
-                { id: "admin", title: "⚙️ Admin Menu" }
-            ]);
-            return true;
-        } catch (e) {
-            console.error('[ADMIN COMMAND ERROR]:', e.message);
-        }
-    }
-
-    return false;
-}
-
-// --- Customer Order & Status Notification Helpers ---
-
-async function ensureContactConsent(phone, name = 'Customer') {
-    try {
-        const custPhone = normalizePhone(phone);
-        if (!custPhone) return;
-        let contact = await Contact.findOne({ phone: custPhone });
-        if (!contact) {
-            contact = new Contact({
-                phone: custPhone,
-                name: name,
-                consent: true,
-                consentDate: new Date(),
-                step: 'main_menu'
-            });
-            await contact.save();
-        } else if (contact.consent !== true) {
-            contact.consent = true;
-            await contact.save();
-        }
-    } catch (e) {
-        console.warn('[Contact Upsert Error]:', e.message);
-    }
-}
-
-async function notifyCustomerOrderPlaced(phone, orderData) {
-    const custPhone = normalizePhone(phone);
-    if (!custPhone) return;
-
-    await ensureContactConsent(custPhone, orderData.customerName);
-
-    const itemsText = (orderData.items || []).map(i => `• ${i.quantity}x *${i.name || i.title}* – ₹${i.price * i.quantity}`).join('\n');
-    const addr = typeof orderData.address === 'object'
-        ? `${orderData.address.street || ''}, ${orderData.address.city || ''}, ${orderData.address.state || ''} - ${orderData.address.zip || ''}`
-        : (orderData.address || 'Your saved address');
-
-    const message = `Namaste ${orderData.customerName || 'Valued Customer'}! 🙏\n\n` +
-        `🎉 *Order Confirmed!* 🛍️\n\n` +
-        `Thank you for ordering pure, natural foods with Mansara Foods!\n\n` +
-        `📦 *Order ID:* *${orderData.orderId}*\n` +
-        `💰 *Total Paid/Due:* *₹${orderData.total}* (${orderData.paymentMethod || 'COD'} - ${orderData.paymentStatus || 'Pending'})\n` +
-        `📍 *Delivery Address:* ${addr}\n\n` +
-        `🛒 *Items Ordered:*\n${itemsText}\n\n` +
-        `✅ We are preparing your fresh batch for dispatch! You will receive live status updates on WhatsApp as it ships.`;
-
-    await sendInteractiveButtons(custPhone, message, [
-        { id: "orders_2_track", title: "Track Order 📦" },
-        { id: "btn_menu", title: "Main Menu 🏠" }
-    ]);
-}
-
-async function sendCustomerReviewRequest(phone, { orderId, customerName = 'Valued Customer', items = [] }) {
-    const custPhone = normalizePhone(phone);
-    if (!custPhone) return;
-
-    await ensureContactConsent(custPhone, customerName);
-
-    const contact = await Contact.findOne({ phone: custPhone });
-    if (contact) {
-        contact.step = 'feedback_pending';
-        await contact.save().catch(e => console.warn(e.message));
-    }
-
-    let itemsList = '';
-    if (items && items.length > 0) {
-        itemsList = '\n*Items in your order:*\n' + items.map(i => `• ${i.name || i}`).join('\n') + '\n';
-    }
-
-    const reviewMsg = `⭐ *How was your order from Mansara Foods?* 🌿\n\n` +
-        `Hi ${customerName}! Your order *#${orderId}* has been delivered! 🎉\n` +
-        itemsList + `\n` +
-        `We would love to hear your feedback. Please rate your experience below or reply with a rating number (1-5):\n\n` +
-        `🔗 *Write a review online:* https://mansarafoods.com/account/orders`;
-
-    await sendInteractiveButtons(custPhone, reviewMsg, [
-        { id: "rate_5_stars", title: "5 Stars ⭐⭐⭐⭐⭐" },
-        { id: "rate_4_stars", title: "4 Stars ⭐⭐⭐⭐" },
-        { id: "rate_3_stars", title: "1-3 Stars 💬" }
-    ]);
-}
-
-async function sendCustomerWelcomeNotification(phone, customerName = 'Valued Customer') {
-    const custPhone = normalizePhone(phone);
-    if (!custPhone) return;
-
-    await ensureContactConsent(custPhone, customerName);
-
-    const welcomeMsg = `🌿 *Welcome to Mansara Foods!* 🌿\n\n` +
-        `Namaste ${customerName}! Thank you for joining our healthy living family. 🙏\n\n` +
-        `🏆 Traditional & Natural Recipes\n` +
-        `✅ Homestyle Quality & Authentic Taste\n` +
-        `✅ Zero Preservatives or Chemicals\n\n` +
-        `🎁 *Special Gift:* Use coupon code *WELCOME10* to get *10% OFF* your first purchase!\n\n` +
-        `Tap below to explore our products:`;
-
-    await sendInteractiveButtons(custPhone, welcomeMsg, [
-        { id: "opt_1_shop", title: "Shop Products 🛍️" },
-        { id: "btn_catalog", title: "Browse Catalog 📁" },
-        { id: "btn_menu", title: "Main Menu 🏠" }
-    ]);
-}
-
-async function sendCustomerCustomNotification(phone, { customerName = 'Valued Customer', orderId = '', messageText = '' }) {
-    const custPhone = normalizePhone(phone);
-    if (!custPhone) return;
-
-    await ensureContactConsent(custPhone, customerName);
-
-    const msg = `💬 *Message from Mansara Foods* 🌿\n\n` +
-        `Dear ${customerName},\n\n` +
-        `${messageText}\n\n` +
-        (orderId ? `📦 *Order ID:* ${orderId}\n\n` : '') +
-        `If you need any assistance, tap below to reply:`;
-
-    await sendInteractiveButtons(custPhone, msg, [
-        { id: "btn_human", title: "Talk to Agent 🎧" },
-        { id: "btn_menu", title: "Main Menu 🏠" }
-    ]);
-}
-
-async function notifyCustomerOrderStatus(phone, orderId, status, trackingLink = '') {
-    const custPhone = normalizePhone(phone);
-    if (!custPhone) return;
-
-    await ensureContactConsent(custPhone, 'Customer');
-
-    const trackUrl = trackingLink || `https://mansarafoods.com/order-tracking/${orderId}`;
-    let statusMsg = "";
-
-    if (status === 'Packed' || status === 'Processing') {
-        statusMsg = `📦 *Order Update:* Your order *${orderId}* has been packed and is ready for dispatch!`;
-    } else if (status === 'Shipped') {
-        statusMsg = `🚚 *Order Update:* Your order *${orderId}* has been shipped!\n\n🔗 *Track Shipment:* ${trackUrl}`;
-    } else if (status === 'Out for Delivery') {
-        statusMsg = `🛵 *Order Update:* Your order *${orderId}* is out for delivery today!`;
-    } else if (status === 'Delivered') {
-        statusMsg = `🎉 *Order Delivered!* 📦\n\nYour order *${orderId}* has been successfully delivered!\n\nThank you for choosing Mansara Foods. 🌿 We hope you love our fresh organic foods.`;
-    } else if (status === 'Cancelled') {
-        statusMsg = `❌ *Order Update:* Your order *${orderId}* has been cancelled.`;
-    } else {
-        statusMsg = `📦 *Order Update:* Your order *${orderId}* status updated to: *${status}*.`;
-    }
-
-    await sendInteractiveButtons(custPhone, statusMsg, [
-        { id: "orders_2_track", title: "Track Order 📦" },
-        { id: "btn_menu", title: "Main Menu 🏠" }
-    ]);
-
-    // Send Product Review Request via WhatsApp when Delivered!
-    if (status === 'Delivered') {
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        await sendCustomerReviewRequest(custPhone, { orderId, customerName: 'Valued Customer' });
-    }
-}
-
-// --- Cron Jobs for Automated Notifications & Follow-ups ---
-
-// 1. Recurring 2-Day (48-Hour) Abandoned Cart Reminder Cron Job (Runs every 6 hours)
-cron.schedule('0 */6 * * *', async () => {
-    console.log("Running Recurring 2-Day (48-Hour) Abandoned Cart Reminder Cron Job...");
-    const twoDaysAgo = new Date(Date.now() - (48 * 60 * 60 * 1000));
+// --- Cron Jobs for Automated Follow-ups ---
+// 1. Abandoned Cart Recovery (Runs every 15 minutes)
+cron.schedule('*/15 * * * *', async () => {
+    console.log("Running Abandoned Cart Recovery Cron Job...");
+    const fifteenMinsAgo = new Date(Date.now() - (15 * 60 * 1000));
+    const oneDayAgo = new Date(Date.now() - (24 * 60 * 60 * 1000));
     
     try {
-        // Find contacts with cart items where lastCartNudgeDate is null OR > 48 hours ago
-        const cartContacts = await Contact.find({
+        const abandonedContacts = await Contact.find({
             is_paused: false,
             cart: { $exists: true, $not: { $size: 0 } },
-            $or: [
-                { lastCartNudgeDate: { $exists: false } },
-                { lastCartNudgeDate: null },
-                { lastCartNudgeDate: { $lt: twoDaysAgo } }
-            ]
+            lastSeen: { $lt: fifteenMinsAgo, $gt: oneDayAgo },
+            lead_status: { $ne: "Cart Nudged" }
         });
 
-        console.log(`[Cart Reminder Cron] Found ${cartContacts.length} contacts eligible for 2-day cart reminder`);
-
-        for (const contact of cartContacts) {
+        for (const contact of abandonedContacts) {
             const lang = contact.language || 'en';
-            const itemsSummary = contact.cart.map(i => `• ${i.quantity}x *${i.name}* (₹${i.price * i.quantity})`).join('\n');
-            const totalAmount = contact.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-
             const nudgeMsg = lang === 'en'
-                ? `🛒 *Items waiting in your cart!* 👋\n\nHi ${contact.name || 'there'}, you have delicious organic items waiting in your cart.\n\n🛒 *Cart Items Summary:*\n${itemsSummary}\n*Total:* ₹${totalAmount}\n\n🎁 Use coupon code *SAVE10* to get *10% OFF* your checkout total!\n\nTap below to complete your order.`
-                : `🛒 *உங்கள் கார்ட்டில் பொருட்கள் உள்ளன!* 👋\n\nவணக்கம், உங்கள் கார்ட்டில் சில சுவையான ஆர்கானிக் பொருட்கள் காத்திருக்கின்றன.\n\n*கார்ட் விபரங்கள்:*\n${itemsSummary}\n\n🎁 செக்அவுட்டில் *10% தள்ளுபடி* பெற *SAVE10* கியூபொனை பயன்படுத்தவும்!\n\nஆர்டரை முடிக்க கீழே தட்டவும்.`;
+                ? `🛒 *Items waiting in your cart!* 👋\n\nHi ${contact.name || 'there'}, we noticed you left some delicious organic products in your cart.\n\nUse code *SAVE10* to get *10% OFF* on your checkout total!\n\nTap below to complete your order.`
+                : `🛒 *உங்கள் கார்ட்டில் பொருட்கள் உள்ளன!* 👋\n\nவணக்கம், உங்கள் கார்ட்டில் சில சுவையான ஆர்கானிக் பொருட்கள் உள்ளதை கவனித்தோம்.\n\nசெக்அவுட்டில் *10% தள்ளுபடி* பெற *SAVE10* கியூபொனை பயன்படுத்தவும்!\n\nஆர்டரை முடிக்க கீழே தட்டவும்.`;
             
             await sendInteractiveButtons(contact.phone, nudgeMsg, [
-                { id: "btn_checkout", title: lang === 'en' ? "Checkout 💳" : "செக்அவுட் 💳" },
                 { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் பார்க்க 🛒" },
                 { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
             ]);
 
-            contact.lastCartNudgeDate = new Date();
             contact.lead_status = "Cart Nudged";
             await contact.save();
-            console.log(`[Cart Reminder Cron] ✓ 2-day reminder sent to ${contact.phone}`);
         }
     } catch (e) {
-        console.error("2-day cart recovery cron error:", e);
+        console.error("Cart recovery cron error:", e);
     }
 });
 
@@ -2036,6 +1807,7 @@ cron.schedule('0 10 * * *', async () => {
     const now = new Date();
     
     try {
+        // Send feedback requests to contacts with orders delivered 1 day ago
         const deliveredContacts = await Contact.find({
             "orders.status": "Delivered",
             lead_status: { $ne: "Feedback Requested" }
@@ -2044,17 +1816,19 @@ cron.schedule('0 10 * * *', async () => {
         for (const contact of deliveredContacts) {
             const deliveredOrder = contact.orders.find(o => o.status === "Delivered");
             if (deliveredOrder) {
-                await sendCustomerReviewRequest(contact.phone, {
-                    orderId: deliveredOrder.orderId,
-                    customerName: contact.name || 'Valued Customer',
-                    items: deliveredOrder.items
-                });
+                const lang = contact.language || 'en';
+                const feedbackMsg = lang === 'en'
+                    ? `🌿 *How was your order ${deliveredOrder.orderId}?* ⭐\n\nThank you for shopping with Mansara Foods! We would love to hear your feedback.\n\nRate your experience from 1 (Poor) to 5 (Excellent) by replying with a number.`
+                    : `🌿 *உங்கள் ஆர்டர் ${deliveredOrder.orderId} எவ்வாறு இருந்தது?* ⭐\n\nமன்சரா ஃபுட்ஸில் வாங்கியதற்கு நன்றி! உங்கள் கருத்தை அறிய விரும்புகிறோம்.\n\n1 (சுமார்) முதல் 5 (மிகச் சிறப்பு) வரை மதிப்பிட்டு பதிலளிக்கவும்.`;
+                
+                await sendMessage(contact.phone, feedbackMsg);
                 contact.lead_status = "Feedback Requested";
                 contact.step = "feedback_pending";
                 await contact.save();
             }
         }
 
+        // 3. Reorder Reminder (Runs for consumable orders older than 30 days)
         const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
         const reorderContacts = await Contact.find({
             "orders.status": "Delivered",
@@ -2116,6 +1890,7 @@ app.post('/webhook', async (req, res) => {
             const phone = message.from;
             const name = contactInfo && contactInfo.profile ? contactInfo.profile.name : '';
             
+            // Sync enquiry with CRM only if webhook URL is configured
             if (process.env.CRM_ENQUIRY_WEBHOOK) {
                 axios.post(process.env.CRM_ENQUIRY_WEBHOOK, {
                     CustomerName: name || phone,
@@ -2150,6 +1925,7 @@ app.post('/webhook', async (req, res) => {
                     if (isTarget && !contact.is_paused) {
                         contact.consent = true;
                     }
+                    // Reset cart recovery nudge status on user activity
                     if (contact.lead_status === "Cart Nudged") {
                         contact.lead_status = "Active";
                     }
@@ -2162,173 +1938,14 @@ app.post('/webhook', async (req, res) => {
                 console.error("DB Error processing webhook:", e);
             }
         } else {
-            console.log('[WEBHOOK] No messageText — skipping');
+            console.log('[WEBHOOK] No messageText — skipping (status update or unsupported type)');
         }
     } else {
         console.log('[WEBHOOK] Not a message event — ignored');
     }
 });
 
-// --- Customer Order & Status Notification API Endpoints ---
-
-// 1. Notify Customer of New Order Confirmation
-app.post('/api/notify-customer-order', async (req, res) => {
-    try {
-        const { phone, orderId } = req.body;
-        if (!phone || !orderId) {
-            return res.status(400).json({ success: false, error: "phone and orderId are required" });
-        }
-        await notifyCustomerOrderPlaced(phone, req.body);
-        res.json({ success: true, message: `Customer order confirmation sent to ${phone}` });
-    } catch (error) {
-        console.error('[API NOTIFY CUSTOMER ORDER ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 2. Notify Customer of Order Status Change
-app.post('/api/notify-customer-status', async (req, res) => {
-    try {
-        const { phone, orderId, status, trackingLink } = req.body;
-        if (!phone || !orderId || !status) {
-            return res.status(400).json({ success: false, error: "phone, orderId, and status are required" });
-        }
-        await notifyCustomerOrderStatus(phone, orderId, status, trackingLink);
-        res.json({ success: true, message: `Customer status notification sent to ${phone}` });
-    } catch (error) {
-        console.error('[API NOTIFY CUSTOMER STATUS ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 3. Notify Customer with Product Review Request (After Delivery)
-app.post('/api/notify-customer-review', async (req, res) => {
-    try {
-        const { phone, orderId, customerName, items } = req.body;
-        if (!phone || !orderId) {
-            return res.status(400).json({ success: false, error: "phone and orderId are required" });
-        }
-        await sendCustomerReviewRequest(phone, { orderId, customerName, items });
-        res.json({ success: true, message: `Customer review request sent to ${phone}` });
-    } catch (error) {
-        console.error('[API NOTIFY CUSTOMER REVIEW ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 4. Notify Customer Welcome Onboarding Message
-app.post('/api/notify-customer-welcome', async (req, res) => {
-    try {
-        const { phone, customerName } = req.body;
-        if (!phone) {
-            return res.status(400).json({ success: false, error: "phone is required" });
-        }
-        await sendCustomerWelcomeNotification(phone, customerName);
-        res.json({ success: true, message: `Welcome message sent to ${phone}` });
-    } catch (error) {
-        console.error('[API NOTIFY CUSTOMER WELCOME ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 5. Notify Customer Custom Admin Message
-app.post('/api/notify-customer-custom', async (req, res) => {
-    try {
-        const { phone, customerName, orderId, messageText } = req.body;
-        if (!phone || !messageText) {
-            return res.status(400).json({ success: false, error: "phone and messageText are required" });
-        }
-        await sendCustomerCustomNotification(phone, { customerName, orderId, messageText });
-        res.json({ success: true, message: `Custom message sent to ${phone}` });
-    } catch (error) {
-        console.error('[API NOTIFY CUSTOMER CUSTOM ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 6. Send Offer / Promotional Broadcast Notification to Customers
-app.post('/api/send-offer-notification', async (req, res) => {
-    try {
-        const { phone, offerTitle, offerDescription, couponCode, segment } = req.body;
-        
-        const offerText = `🏷️ *${offerTitle || 'Special Offer from Mansara Foods!'}* 🎁\n\n` +
-            `${offerDescription || 'Enjoy authentic traditional health mixes & podis with special discount!'}\n\n` +
-            `🎟️ Use Coupon Code: *${couponCode || 'WELCOME10'}* at checkout for discount!\n\n` +
-            `🌿 Pure, zero preservatives, 100% natural.`;
-
-        let targetContacts = [];
-        if (phone) {
-            targetContacts = [normalizePhone(phone)];
-        } else {
-            let query = {};
-            if (segment === 'opt_in') query.consent = true;
-            else if (segment === 'cart') query.cart = { $exists: true, $not: { $size: 0 } };
-
-            const contacts = await Contact.find(query);
-            targetContacts = contacts.map(c => c.phone);
-        }
-
-        let sentCount = 0;
-        for (const targetPhone of targetContacts) {
-            await sendInteractiveButtons(targetPhone, offerText, [
-                { id: "opt_1_shop", title: "Shop Products 🛍️" },
-                { id: "btn_catalog", title: "Browse Categories 📁" },
-                { id: "btn_menu", title: "Main Menu 🏠" }
-            ]);
-            sentCount++;
-        }
-
-        res.json({ success: true, sentCount, message: `Offer notification sent to ${sentCount} customer(s)` });
-    } catch (error) {
-        console.error('[API SEND OFFER ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 7. Trigger 2-Day Abandoned Cart Reminders (On-Demand Admin API)
-app.post('/api/trigger-cart-reminders', async (req, res) => {
-    try {
-        const twoDaysAgo = new Date(Date.now() - (48 * 60 * 60 * 1000));
-        const cartContacts = await Contact.find({
-            is_paused: false,
-            cart: { $exists: true, $not: { $size: 0 } },
-            $or: [
-                { lastCartNudgeDate: { $exists: false } },
-                { lastCartNudgeDate: null },
-                { lastCartNudgeDate: { $lt: twoDaysAgo } }
-            ]
-        });
-
-        let sentCount = 0;
-        for (const contact of cartContacts) {
-            const lang = contact.language || 'en';
-            const itemsSummary = contact.cart.map(i => `• ${i.quantity}x *${i.name}* (₹${i.price * i.quantity})`).join('\n');
-            const totalAmount = contact.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-
-            const nudgeMsg = lang === 'en'
-                ? `🛒 *Items waiting in your cart!* 👋\n\nHi ${contact.name || 'there'}, you have delicious organic items waiting in your cart.\n\n🛒 *Cart Items Summary:*\n${itemsSummary}\n*Total:* ₹${totalAmount}\n\n🎁 Use coupon code *SAVE10* to get *10% OFF* your checkout total!\n\nTap below to complete your order.`
-                : `🛒 *உங்கள் கார்ட்டில் பொருட்கள் உள்ளன!* 👋\n\nவணக்கம், உங்கள் கார்ட்டில் சில சுவையான ஆர்கானிக் பொருட்கள் காத்திருக்கின்றன.\n\n*கார்ட் விபரங்கள்:*\n${itemsSummary}\n\n🎁 செக்அவுட்டில் *10% தள்ளுபடி* பெற *SAVE10* கியூபொனை பயன்படுத்தவும்!\n\nஆர்டரை முடிக்க கீழே தட்டவும்.`;
-            
-            await sendInteractiveButtons(contact.phone, nudgeMsg, [
-                { id: "btn_checkout", title: lang === 'en' ? "Checkout 💳" : "செக்அவுட் 💳" },
-                { id: "btn_cart", title: lang === 'en' ? "View Cart 🛒" : "கார்ட் பார்க்க 🛒" },
-                { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
-            ]);
-
-            contact.lastCartNudgeDate = new Date();
-            contact.lead_status = "Cart Nudged";
-            await contact.save();
-            sentCount++;
-        }
-
-        res.json({ success: true, sentCount, message: `2-day cart reminder sent to ${sentCount} contact(s)` });
-    } catch (error) {
-        console.error('[API CART REMINDERS ERROR]:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// --- Dashboard & Admin API Endpoints ---
+// --- Dashboard API Endpoints ---
 app.get('/crm', async (req, res) => {
     try {
         const contacts = await Contact.find().sort({ lastSeen: -1 });
@@ -2336,30 +1953,66 @@ app.get('/crm', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Failed to fetch contacts" }); }
 });
 
+// --- Analytics Dashboard API ---
 app.get('/crm/analytics', async (req, res) => {
     try {
-        const metrics = await getAdminStoreMetrics();
         const contacts = await Contact.find();
         
+        let totalRevenue = 0;
+        let activeOrders = 0;
+        let openTickets = 0;
+        let optedInCount = 0;
         let botCount = 0;
         let pausedCount = 0;
-        const funnel = { onboarding: 0, browsing: 0, cart: 0, checkout: 0, completed: 0 };
+
+        const funnel = {
+            onboarding: 0,
+            browsing: 0,
+            cart: 0,
+            checkout: 0,
+            completed: 0
+        };
 
         contacts.forEach(c => {
-            if (c.is_paused) pausedCount++; else botCount++;
+            // Consent opt-in rate
+            if (c.consent === true) optedInCount++;
+            
+            // Bot vs human
+            if (c.is_paused) pausedCount++;
+            else botCount++;
+
+            // Funnel calculation
             const state = c.funnelState || 'onboarding';
             if (funnel[state] !== undefined) funnel[state]++;
+
+            // Tickets count
+            if (c.tickets) {
+                openTickets += c.tickets.filter(t => t.status === 'Open').length;
+            }
+
+            // Orders and Revenue
+            if (c.orders) {
+                c.orders.forEach(o => {
+                    if (o.status !== 'Cancelled') {
+                        totalRevenue += o.total || 0;
+                        if (['Placed', 'Packed', 'Shipped'].includes(o.status)) {
+                            activeOrders++;
+                        }
+                    }
+                });
+            }
         });
 
+        const consentRate = contacts.length > 0 ? Math.round((optedInCount / contacts.length) * 100) : 0;
+        const botResolutionRate = (botCount + pausedCount) > 0 ? Math.round((botCount / (botCount + pausedCount)) * 100) : 100;
+
         res.json({
-            totalContacts: metrics.totalContacts,
-            totalRevenue: metrics.totalRevenue,
-            todaySales: metrics.todaySales,
-            activeOrders: metrics.pendingOrdersCount,
-            openTickets: metrics.openTickets,
-            lowStockCount: metrics.lowStockCount,
-            outOfStockCount: metrics.outOfStockCount,
-            consentRate: metrics.totalContacts > 0 ? Math.round((metrics.optedInContacts / metrics.totalContacts) * 100) : 0,
+            totalContacts: contacts.length,
+            totalRevenue,
+            activeOrders,
+            openTickets,
+            consentRate,
+            botResolutionRate,
             funnel,
             botVsHuman: { bot: botCount, human: pausedCount }
         });
@@ -2369,37 +2022,7 @@ app.get('/crm/analytics', async (req, res) => {
     }
 });
 
-app.get('/api/admin/metrics', async (req, res) => {
-    try {
-        const metrics = await getAdminStoreMetrics();
-        res.json({ success: true, metrics });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-app.get('/api/admin/orders', async (req, res) => {
-    try {
-        const webOrders = await OrderModel.find().sort({ date: -1 }).limit(50).lean();
-        res.json({ success: true, count: webOrders.length, orders: webOrders });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-app.post('/api/admin/update-stock', async (req, res) => {
-    try {
-        const { productId, stock } = req.body;
-        if (!productId || typeof stock !== 'number') {
-            return res.status(400).json({ success: false, error: "productId and numeric stock are required" });
-        }
-        const updated = await ProductModel.findByIdAndUpdate(productId, { stock }, { new: true });
-        res.json({ success: true, product: updated });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
+// --- Pause/Resume Bot Endpoint ---
 app.post('/crm/:phone/pause', async (req, res) => {
     try {
         const contact = await Contact.findOne({ phone: req.params.phone });
@@ -2407,7 +2030,7 @@ app.post('/crm/:phone/pause', async (req, res) => {
 
         contact.is_paused = req.body.is_paused;
         if (!contact.is_paused) {
-            contact.step = 'main_menu';
+            contact.step = 'main_menu'; // Reset to main menu on resume
         }
         await contact.save();
 
@@ -2417,6 +2040,7 @@ app.post('/crm/:phone/pause', async (req, res) => {
     }
 });
 
+// --- Broadcast Campaign Endpoint ---
 app.post('/crm/broadcast', async (req, res) => {
     try {
         const { messageText, segment } = req.body;
@@ -2445,9 +2069,10 @@ app.post('/crm/broadcast', async (req, res) => {
     }
 });
 
+// --- Update Order Status (ERP / Shipping mock) ---
 app.post('/crm/:phone/update-order', async (req, res) => {
     try {
-        const { orderId, status } = req.body;
+        const { orderId, status } = req.body; // status: Placed, Packed, Shipped, Delivered, Cancelled
         const contact = await Contact.findOne({ phone: req.params.phone });
         if (!contact) return res.status(404).json({ error: "Contact not found" });
 
@@ -2457,8 +2082,30 @@ app.post('/crm/:phone/update-order', async (req, res) => {
         order.status = status;
         await contact.save();
 
-        const trackingLink = order.trackingLink || `https://mansarafoods.com/order-tracking/${orderId}`;
-        await notifyCustomerOrderStatus(req.params.phone, orderId, status, trackingLink).catch(e => console.error(e));
+        // Send WhatsApp notification to user
+        const lang = contact.language || 'en';
+        let alertMsg = "";
+        if (status === 'Packed') {
+            alertMsg = lang === 'en' 
+                ? `📦 *Order Update:* Your order *${orderId}* has been packed and is ready for dispatch!`
+                : `📦 *ऑर्डर अपडेट:* आपका ऑर्डर *${orderId}* पैक हो गया है और प्रेषण के लिए तैयार है!`;
+        } else if (status === 'Shipped') {
+            alertMsg = lang === 'en'
+                ? `🚚 *Order Update:* Your order *${orderId}* has been shipped!\nTrack here: ${order.trackingLink}`
+                : `🚚 *ऑर्डर अपडेट:* आपका ऑर्डर *${orderId}* शिप कर दिया गया है!\nयहाँ ट्रैक करें: ${order.trackingLink}`;
+        } else if (status === 'Delivered') {
+            alertMsg = lang === 'en'
+                ? `🎉 *Order Delivered:* Your order *${orderId}* has been successfully delivered!\n\nThank you for choosing Mansara Foods. 🌿\nWe hope you love our organic products.`
+                : `🎉 *ऑर्डर डिलीवर हो गया:* आपका ऑर्डर *${orderId}* सफलतापूर्वक वितरित कर दिया गया है!\n\nमनसारा फूड्स को चुनने के लिए धन्यवाद। 🌿`;
+        } else if (status === 'Cancelled') {
+            alertMsg = lang === 'en'
+                ? `❌ *Order Cancelled:* Your order *${orderId}* has been cancelled.`
+                : `❌ *ऑर्डर रद्द:* आपका ऑर्डर *${orderId}* रद्द कर दिया गया है।`;
+        }
+
+        if (alertMsg) {
+            await sendMessage(contact.phone, alertMsg);
+        }
 
         res.json({ success: true, order });
     } catch (err) {
@@ -2466,6 +2113,7 @@ app.post('/crm/:phone/update-order', async (req, res) => {
     }
 });
 
+// --- Resolve Support Ticket Endpoint ---
 app.post('/crm/:phone/resolve-ticket', async (req, res) => {
     try {
         const { ticketId } = req.body;
@@ -2504,14 +2152,17 @@ app.delete('/crm/:phone', async (req, res) => {
         else res.status(404).json({ error: "Contact not found" });
     } catch (err) { res.status(500).json({ error: "Failed to delete" }); }
 });
-
+// --- Update WhatsApp Profile Picture (DP) via Meta Cloud API ---
 app.post('/crm/update-whatsapp-dp', async (req, res) => {
     try {
+        console.log(`[DP UPDATE] Initiating official Meta WhatsApp Business DP upload...`);
+
         if (PHONE_NUMBER_ID && ACCESS_TOKEN) {
             const jpgPath = path.join(__dirname, 'public', 'logo_dp.jpg');
             const fileBuffer = fs.readFileSync(jpgPath);
             const fileLength = fileBuffer.length;
 
+            // Step 1: Create Meta Resumable Upload Session
             const sessionRes = await axios.post(
                 `https://graph.facebook.com/v19.0/app/uploads`,
                 null,
@@ -2522,6 +2173,7 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
             );
             const uploadHandle = sessionRes.data.id;
 
+            // Step 2: Upload Binary Data to Meta
             const uploadRes = await axios.post(
                 `https://graph.facebook.com/v19.0/${uploadHandle}`,
                 fileBuffer,
@@ -2535,6 +2187,7 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
             );
             const pictureHandle = uploadRes.data.h;
 
+            // Step 3: Update WhatsApp Business Profile Picture Handle
             const metaResponse = await axios.post(
                 `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/whatsapp_business_profile`,
                 {
@@ -2549,19 +2202,25 @@ app.post('/crm/update-whatsapp-dp', async (req, res) => {
                 }
             );
 
+            console.log('[DP UPDATE] Success! Meta profile picture handle updated:', metaResponse.data);
             return res.json({ success: true, meta: metaResponse.data, logoUrl: `${BACKEND_URL}/logo_dp.jpg` });
         }
 
-        res.json({ success: false, message: "Local DP updated." });
+        res.json({ 
+            success: false, 
+            message: "Local DP updated. Configure ACCESS_TOKEN and PHONE_NUMBER_ID in .env for Meta server sync."
+        });
     } catch (error) {
-        console.error('[DP UPDATE] Error:', error?.response?.data || error.message);
-        res.status(500).json({ success: false, error: error?.response?.data || error.message });
+        console.error('[DP UPDATE] Error updating profile DP:', error?.response?.data || error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: error?.response?.data || error.message
+        });
     }
 });
 
 async function sendTemplateMessage(to, templateName, languageCode = 'en', components = []) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return false;
-    const target = normalizePhone(to);
     try {
         const response = await axios({
             method: 'POST',
@@ -2569,7 +2228,7 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
             data: {
                 messaging_product: 'whatsapp',
-                to: target,
+                to: to,
                 type: 'template',
                 template: {
                     name: templateName,
@@ -2578,13 +2237,15 @@ async function sendTemplateMessage(to, templateName, languageCode = 'en', compon
                 }
             }
         });
+        console.log(`[sendTemplateMessage] Success sending '${templateName}' to ${to}:`, response.data?.messages?.[0]?.id);
         return true;
     } catch (error) {
-        console.error(`[sendTemplateMessage] Error:`, error.response ? error.response.data : error.message);
+        console.error(`[sendTemplateMessage] Error sending '${templateName}' to ${to}:`, error.response ? error.response.data : error.message);
         return false;
     }
 }
 
+// --- Direct OTP Delivery API (Website Registration & Forgot Password) ---
 app.post('/api/send-otp', async (req, res) => {
     try {
         const { phone, otp, type, templateName } = req.body;
@@ -2592,20 +2253,31 @@ app.post('/api/send-otp', async (req, res) => {
             return res.status(400).json({ success: false, error: "phone and otp are required" });
         }
 
-        const targetPhone = normalizePhone(phone);
+        const cleanPhone = phone.toString().replace(/\D/g, '');
+        const targetPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
         const activeTemplate = templateName || process.env.OTP_TEMPLATE_NAME || 'mansara_otp';
 
+        // 1. Try Meta Template Message (bypasses 24-hour window rule for new customers)
+        console.log(`[API SEND OTP] Attempting Template '${activeTemplate}' for ${targetPhone}...`);
         const templateSent = await sendTemplateMessage(targetPhone, activeTemplate, 'en', [
             {
                 type: 'body',
-                parameters: [{ type: 'text', text: String(otp) }]
+                parameters: [
+                    { type: 'text', text: String(otp) }
+                ]
             }
         ]);
 
+        // 2. Fallback to free-form text message if template is not setup or fails
         if (!templateSent) {
-            let message = type === 'forgot_password'
-                ? `🔐 *Mansara Foods - Password Reset Code*\n\nYour verification code is: *${otp}*\nValid for 10 minutes.`
-                : `🌿 *Welcome to Mansara Foods!*\n\nYour verification code is: *${otp}*\nValid for 10 minutes.`;
+            console.log(`[API SEND OTP] Fallback: Sending text message OTP to ${targetPhone}...`);
+            let message = "";
+            if (type === 'forgot_password') {
+                message = `🔐 *Mansara Foods - Password Reset Code*\n\nNamaste! 🙏\nYour verification code is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+            } else {
+                message = `🌿 *Welcome to Mansara Foods!* 🙏\n\nYour account registration verification code is: *${otp}*\n\nValid for 10 minutes. Please enter this code on the website to verify your account.`;
+            }
             await sendMessage(targetPhone, message);
         }
 
@@ -2616,6 +2288,103 @@ app.post('/api/send-otp', async (req, res) => {
     }
 });
 
+// --- Admin WhatsApp Order & Status Command Functions ---
+async function handleAdminCommand(phone, messageText) {
+    const rawMsg = (messageText || '').trim();
+    let orderId = "";
+    let newStatus = "";
+
+    // 1. Button payload: adm_Status_OrderId (e.g. adm_Shipped_ORD-123456)
+    if (rawMsg.startsWith('adm_')) {
+        const parts = rawMsg.split('_');
+        if (parts.length >= 3) {
+            newStatus = parts[1]; // Packed, Shipped, Delivered, Cancelled
+            orderId = parts.slice(2).join('_');
+        }
+    } else {
+        // 2. Text command: "ORD-123456 Packed" or "ORD123456 Shipped"
+        const tokens = rawMsg.split(/\s+/);
+        if (tokens.length >= 2) {
+            const firstToken = tokens[0].toUpperCase();
+            const secondToken = tokens[1];
+            if (firstToken.startsWith('ORD')) {
+                orderId = firstToken;
+                const statusInput = secondToken.toLowerCase();
+                if (statusInput.includes('pack')) newStatus = 'Packed';
+                else if (statusInput.includes('ship')) newStatus = 'Shipped';
+                else if (statusInput.includes('deliv')) newStatus = 'Delivered';
+                else if (statusInput.includes('canc')) newStatus = 'Cancelled';
+            }
+        }
+    }
+
+    if (!orderId || !newStatus) return false;
+
+    console.log(`[ADMIN COMMAND] Admin ${phone} requested status update: Order ${orderId} -> ${newStatus}`);
+
+    let customerPhone = "";
+
+    // A. Update in Website Backend DB (Order model)
+    try {
+        const OrderModel = mongoose.model('Order');
+        const dbOrder = await OrderModel.findOne({ orderId: new RegExp(`^${orderId}$`, 'i') }).populate('user');
+        if (dbOrder) {
+            dbOrder.orderStatus = newStatus;
+            await dbOrder.save();
+            if (dbOrder.user) {
+                customerPhone = dbOrder.user.whatsapp || dbOrder.user.phone;
+            }
+            console.log(`[ADMIN COMMAND] Updated website DB Order ${orderId} to ${newStatus}`);
+        }
+    } catch (e) {
+        console.warn('[ADMIN COMMAND] Could not update website DB directly:', e.message);
+    }
+
+    // B. Update in Contact DB (whatsapp-bot)
+    try {
+        const contactWithOrder = await Contact.findOne({ "orders.orderId": new RegExp(`^${orderId}$`, 'i') });
+        if (contactWithOrder) {
+            const orderObj = contactWithOrder.orders.find(o => o.orderId.toUpperCase() === orderId.toUpperCase());
+            if (orderObj) {
+                orderObj.status = newStatus;
+                await contactWithOrder.save();
+                if (!customerPhone) customerPhone = contactWithOrder.phone;
+            }
+            console.log(`[ADMIN COMMAND] Updated Contact DB Order ${orderId} to ${newStatus}`);
+        }
+    } catch (e) {
+        console.warn('[ADMIN COMMAND] Could not update contact DB:', e.message);
+    }
+
+    // C. Notify Customer on WhatsApp
+    if (customerPhone) {
+        const cleanCustPhone = customerPhone.replace(/\D/g, '');
+        const targetCustPhone = cleanCustPhone.length === 10 ? '91' + cleanCustPhone : cleanCustPhone;
+
+        let statusEmoji = "📦";
+        if (newStatus === 'Shipped') statusEmoji = "🚚";
+        else if (newStatus === 'Delivered') statusEmoji = "✅";
+        else if (newStatus === 'Cancelled') statusEmoji = "❌";
+
+        const custMsg = `${statusEmoji} *Mansara Foods Order Update!*\n\n` +
+            `Hi! Your order *${orderId}* status has been updated to: *${newStatus}* ${statusEmoji}\n\n` +
+            `📍 Track status: https://mansarafoods.com/order-tracking/${orderId}\n\n` +
+            `Thank you for choosing Mansara Foods! 🙏`;
+
+        await sendMessage(targetCustPhone, custMsg);
+    }
+
+    // D. Send Confirmation to Admin
+    const confirmMsg = `✅ *Order Status Updated Successfully!*\n\n` +
+        `📦 *Order ID:* ${orderId}\n` +
+        `🔄 *New Status:* ${newStatus}\n` +
+        `👤 *Customer Notified:* ${customerPhone || 'N/A'}`;
+
+    await sendMessage(phone, confirmMsg);
+    return true;
+}
+
+// --- Helper to Send Admin Order Notification ---
 async function notifyAdminNewOrder(orderData) {
     const adminPhone = process.env.ADMIN_PHONE || '918838887064';
 
@@ -2641,6 +2410,7 @@ async function notifyAdminNewOrder(orderData) {
     ]);
 }
 
+// --- Admin Order Alert API Endpoint ---
 app.post('/api/notify-admin-order', async (req, res) => {
     try {
         await notifyAdminNewOrder(req.body);
@@ -2651,16 +2421,22 @@ app.post('/api/notify-admin-order', async (req, res) => {
     }
 });
 
+// --- Admin Low / Out of Stock Alert API Endpoint ---
 app.post('/api/notify-admin-stock', async (req, res) => {
     try {
         const { productName, stock } = req.body;
         const adminPhone = process.env.ADMIN_PHONE || '918838887064';
 
-        let alertMsg = stock <= 0
-            ? `🚨 *OUT OF STOCK ALERT!* ❌\n\nProduct: *${productName}*\nStock: *0 items*\n\n⚠️ Product is OUT OF STOCK. Restock immediately!`
-            : `⚠️ *LOW STOCK ALERT!* 📦\n\nProduct: *${productName}*\nStock: *${stock} items remaining*`;
+        let alertMsg = "";
+        if (stock <= 0) {
+            alertMsg = `🚨 *OUT OF STOCK ALERT!* ❌\n\nProduct: *${productName}*\nRemaining Stock: *0 items*\n\n⚠️ This product is now OUT OF STOCK on website and WhatsApp bot catalog. Please restock immediately!`;
+        } else {
+            alertMsg = `⚠️ *LOW STOCK ALERT!* 📦\n\nProduct: *${productName}*\nRemaining Stock: *${stock} items*\n\n💡 Stock is running low. Please re-order soon!`;
+        }
 
+        console.log(`[STOCK ALERT] Sending stock alert for ${productName} (stock: ${stock}) to Admin ${adminPhone}...`);
         await sendMessage(adminPhone, alertMsg);
+
         res.json({ success: true, message: `Stock alert sent to Admin ${adminPhone}` });
     } catch (error) {
         console.error('[API NOTIFY ADMIN STOCK ERROR]:', error.message);
@@ -2669,5 +2445,5 @@ app.post('/api/notify-admin-stock', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Mansara Foods WhatsApp Automation Server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
