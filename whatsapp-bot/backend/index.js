@@ -2694,6 +2694,81 @@ app.post('/api/notify-admin-stock', async (req, res) => {
     }
 });
 
+// --- Keep-Alive Utility Template Ping (Every 20 Hours) ---
+// Sends a Utility Template ping to Sales & Admin numbers every 20 hours
+// to keep Meta's WhatsApp Business session active and ensure
+// all order notifications reach the recipients without any interruption.
+const KEEP_ALIVE_PHONES = (process.env.ADMIN_PHONE || '919342400879,918838887064')
+    .split(',')
+    .map(p => p.trim())
+    .filter(p => p.length >= 10);
+
+async function sendKeepAlivePing() {
+    if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+        console.log('[KEEP-ALIVE] Skipping ping: Missing META credentials');
+        return;
+    }
+
+    console.log(`[KEEP-ALIVE] Sending 20-hour Utility Template ping to: ${KEEP_ALIVE_PHONES.join(', ')}...`);
+
+    for (const phone of KEEP_ALIVE_PHONES) {
+        const normalizedPhone = normalizePhone(phone);
+        if (!normalizedPhone || normalizedPhone.length < 10) continue;
+
+        try {
+            const res = await axios({
+                method: 'POST',
+                url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+                headers: {
+                    'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: normalizedPhone,
+                    type: 'template',
+                    template: {
+                        name: 'sales_lead_alert',
+                        language: { code: 'en_US' },
+                        components: [
+                            {
+                                type: 'body',
+                                parameters: [
+                                    { type: 'text', text: 'Mansara Team' },
+                                    { type: 'text', text: 'System Keep-Alive Ping' },
+                                    { type: 'text', text: 'Mansara Foods WhatsApp service is active and running. Order notifications are live!' },
+                                    { type: 'text', text: 'Mansarafoods.com' }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            });
+
+            console.log(`[KEEP-ALIVE] ✓ Ping delivered to ${normalizedPhone} | Message ID: ${res.data?.messages?.[0]?.id}`);
+        } catch (err) {
+            console.error(`[KEEP-ALIVE] ❌ Failed to ping ${normalizedPhone}:`, err.response?.data || err.message);
+        }
+    }
+}
+
+// Cron: Run every 20 hours (at minute 0, every 20th hour: 0:00, 20:00, 16:00, ...)
+// Cron expression: "0 */20 * * *" = at minute 0, every 20 hours
+cron.schedule('0 */20 * * *', async () => {
+    console.log(`[KEEP-ALIVE CRON] Triggered at ${new Date().toISOString()}`);
+    await sendKeepAlivePing();
+}, {
+    timezone: 'Asia/Kolkata'
+});
+
+console.log('[KEEP-ALIVE CRON] Scheduled: every 20 hours to Sales & Admin numbers');
+
+// Trigger once immediately on startup to confirm system is live
+setTimeout(() => {
+    sendKeepAlivePing();
+}, 10000); // Wait 10 seconds after startup before first ping
+
 app.listen(PORT, () => {
     console.log(`🚀 Mansara Foods WhatsApp Automation Server is running on port ${PORT}`);
 });
