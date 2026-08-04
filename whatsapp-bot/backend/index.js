@@ -105,44 +105,59 @@ const backendModelsDir = path.resolve(__dirname, '../../../mansara backend/model
 
 let ProductModel, OrderModel, CategoryModel, UserModel, SettingModel;
 
-try {
-    const prodModule = require(path.join(backendModelsDir, 'Product'));
-    ProductModel = prodModule.Product || prodModule;
-    console.log('✅ Registered website Product model');
-} catch (e) {
-    console.warn('⚠️ Fallback Product model:', e.message);
+if (fs.existsSync(path.join(backendModelsDir, 'Product.js'))) {
+    try {
+        const prodModule = require(path.join(backendModelsDir, 'Product'));
+        ProductModel = prodModule.Product || prodModule;
+        console.log('✅ Registered website Product model');
+    } catch (e) {
+        ProductModel = mongoose.models.Product || mongoose.model('Product', new mongoose.Schema({ name: String, price: Number, offerPrice: Number, stock: Number, category: String, description: String, image: String, isActive: Boolean }, { strict: false }));
+    }
+} else {
     ProductModel = mongoose.models.Product || mongoose.model('Product', new mongoose.Schema({ name: String, price: Number, offerPrice: Number, stock: Number, category: String, description: String, image: String, isActive: Boolean }, { strict: false }));
 }
 
-try {
-    OrderModel = require(path.join(backendModelsDir, 'Order'));
-    console.log('✅ Registered website Order model');
-} catch (e) {
-    console.warn('⚠️ Fallback Order model:', e.message);
+if (fs.existsSync(path.join(backendModelsDir, 'Order.js'))) {
+    try {
+        OrderModel = require(path.join(backendModelsDir, 'Order'));
+        console.log('✅ Registered website Order model');
+    } catch (e) {
+        OrderModel = mongoose.models.Order || mongoose.model('Order', new mongoose.Schema({ orderId: String }, { strict: false }));
+    }
+} else {
     OrderModel = mongoose.models.Order || mongoose.model('Order', new mongoose.Schema({ orderId: String }, { strict: false }));
 }
 
-try {
-    CategoryModel = require(path.join(backendModelsDir, 'Category'));
-    console.log('✅ Registered website Category model');
-} catch (e) {
-    console.warn('⚠️ Fallback Category model:', e.message);
+if (fs.existsSync(path.join(backendModelsDir, 'Category.js'))) {
+    try {
+        CategoryModel = require(path.join(backendModelsDir, 'Category'));
+        console.log('✅ Registered website Category model');
+    } catch (e) {
+        CategoryModel = mongoose.models.Category || mongoose.model('Category', new mongoose.Schema({ name: String }, { strict: false }));
+    }
+} else {
     CategoryModel = mongoose.models.Category || mongoose.model('Category', new mongoose.Schema({ name: String }, { strict: false }));
 }
 
-try {
-    UserModel = require(path.join(backendModelsDir, 'User'));
-    console.log('✅ Registered website User model');
-} catch (e) {
-    console.warn('⚠️ Fallback User model:', e.message);
+if (fs.existsSync(path.join(backendModelsDir, 'User.js'))) {
+    try {
+        UserModel = require(path.join(backendModelsDir, 'User'));
+        console.log('✅ Registered website User model');
+    } catch (e) {
+        UserModel = mongoose.models.User || mongoose.model('User', new mongoose.Schema({ name: String, phone: String, whatsapp: String }, { strict: false }));
+    }
+} else {
     UserModel = mongoose.models.User || mongoose.model('User', new mongoose.Schema({ name: String, phone: String, whatsapp: String }, { strict: false }));
 }
 
-try {
-    SettingModel = require(path.join(backendModelsDir, 'Setting'));
-    console.log('✅ Registered website Setting model');
-} catch (e) {
-    console.warn('⚠️ Fallback Setting model:', e.message);
+if (fs.existsSync(path.join(backendModelsDir, 'Setting.js'))) {
+    try {
+        SettingModel = require(path.join(backendModelsDir, 'Setting'));
+        console.log('✅ Registered website Setting model');
+    } catch (e) {
+        SettingModel = mongoose.models.Setting || mongoose.model('Setting', new mongoose.Schema({}, { strict: false }));
+    }
+} else {
     SettingModel = mongoose.models.Setting || mongoose.model('Setting', new mongoose.Schema({}, { strict: false }));
 }
 
