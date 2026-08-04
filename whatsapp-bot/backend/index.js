@@ -55,6 +55,7 @@ const contactSchema = new mongoose.Schema({
     lead_status: { type: String, default: "New" },
     lead_score: { type: Number, default: 0 },
     is_paused: { type: Boolean, default: false },
+    is_demo: { type: Boolean, default: false }, // Demo mode: full chatbot works, but no admin/sales notifications sent & orders not saved to main DB
 
     // Mansara Foods E-commerce Fields
     language: { type: String, default: "en" }, // 'en', 'ta'
@@ -747,6 +748,28 @@ async function handleBotReply(phone, messageText, contact) {
 
     const isRestartKeyword = ['hi', 'hello', 'hey', 'menu', 'main menu', 'restart', 'start', 'btn_menu', 'hi!', '0'].includes(msg) || msg === '0';
 
+    // --- DEMO MODE TRIGGER ---
+    // If user sends 'demo', enable demo mode: full bot works but no real admin/sales alerts
+    if (msg === 'demo') {
+        contact.is_demo = true;
+        contact.is_paused = false;
+        contact.step = 'main_menu';
+        contact.funnelState = 'browsing';
+        await contact.save();
+        const demoWelcomeMsg = `🎯 *DEMO MODE ACTIVATED*\n\n✅ The full Mansara Foods chatbot is now running in demo mode.\n\n📝 In demo mode:\n• All bot features work normally\n• Your chat & orders are saved for demo purposes\n• ❌ NO real admin/sales notifications will be sent\n• ❌ Orders will NOT go to the production database\n\n_Send *Hi* anytime to exit demo mode and use the live bot._\n\n👇 Starting bot...`;
+        await sendMessage(phone, demoWelcomeMsg);
+        await new Promise(r => setTimeout(r, 800));
+        await sendMainMenu(phone, contact);
+        return;
+    }
+
+    // Exit demo mode when user sends 'hi' / restart keywords
+    if (isRestartKeyword && contact.is_demo) {
+        contact.is_demo = false;
+        await contact.save();
+        console.log(`[DEMO MODE] Exited demo mode for ${phone}`);
+    }
+
     if (contact.is_paused) {
         if (isRestartKeyword) {
             contact.is_paused = false;
@@ -1299,7 +1322,13 @@ async function handleBotReply(phone, messageText, contact) {
             contact.cart = [];
             contact.funnelState = 'completed';
 
-            await saveOrderToDatabase(newOrder, contact);
+            // In DEMO mode: tag order as demo, skip real DB save and admin alerts
+            if (contact.is_demo) {
+                newOrder.is_demo = true; // Tag the order as demo
+                console.log(`[DEMO MODE] Order ${orderId} created in demo mode for ${phone} — skipping DB save & admin notification.`);
+            } else {
+                await saveOrderToDatabase(newOrder, contact);
+            }
 
             if (isCod) {
                 const earnedPoints = Math.floor(total * 0.05);
@@ -1307,27 +1336,32 @@ async function handleBotReply(phone, messageText, contact) {
                 contact.step = 'main_menu';
                 await contact.save();
 
-                const successMsg = t.cod_success
+                const demoSuffix = contact.is_demo ? `\n\n🎯 *[DEMO ORDER — Not a real order. No notifications sent.]*` : '';
+                const successMsg = (t.cod_success
                     .replace('{orderId}', orderId)
                     .replace('{total}', total)
-                    .replace('{points}', earnedPoints);
+                    .replace('{points}', earnedPoints)) + demoSuffix;
 
                 await sendInteractiveButtons(phone, successMsg, [
                     { id: "orders_2_track", title: lang === 'en' ? "Track Order 📦" : "ஆர்டரைக் கண்காணிக்க 📦" },
                     { id: "btn_menu", title: lang === 'en' ? "Main Menu 🏠" : "முதன்மை பட்டி 🏠" }
                 ]);
 
-                syncCrmOrder(contact, newOrder);
-                notifyAdminNewOrder({
-                    orderId: newOrder.orderId,
-                    customerName: contact.name || 'WhatsApp Customer',
-                    customerPhone: phone,
-                    address: contact.address || 'N/A',
-                    items: newOrder.items,
-                    total: newOrder.total,
-                    paymentMethod: 'COD',
-                    paymentStatus: 'COD'
-                }).catch(err => console.error('[ADMIN NOTIFY ERROR]:', err.message));
+                if (!contact.is_demo) {
+                    syncCrmOrder(contact, newOrder);
+                    notifyAdminNewOrder({
+                        orderId: newOrder.orderId,
+                        customerName: contact.name || 'WhatsApp Customer',
+                        customerPhone: phone,
+                        address: contact.address || 'N/A',
+                        items: newOrder.items,
+                        total: newOrder.total,
+                        paymentMethod: 'COD',
+                        paymentStatus: 'COD'
+                    }).catch(err => console.error('[ADMIN NOTIFY ERROR]:', err.message));
+                } else {
+                    console.log(`[DEMO MODE] Skipped syncCrmOrder & notifyAdminNewOrder for demo order ${orderId}.`);
+                }
             } else {
                 contact.step = 'payment_pending';
                 await contact.save();
