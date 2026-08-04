@@ -472,13 +472,18 @@ function normalizePhone(phone) {
     if (!phone) return '';
     const clean = phone.toString().replace(/\D/g, '');
     if (clean.length === 10) return '91' + clean;
-    return clean;
+    if (clean.length > 10 && clean.length <= 15) return clean;
+    return '';
 }
 
 // --- Send Message Functions ---
 async function sendMessage(to, text) {
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     const target = normalizePhone(to);
+    if (!target || target.length < 10) {
+        console.warn(`[BOT SERVICE] Skipping sendMessage: Invalid phone '${to}'`);
+        return;
+    }
     try {
         await axios({
             method: 'POST',
@@ -2178,6 +2183,12 @@ app.post('/webhook', async (req, res) => {
             }
         } else {
             console.log('[WEBHOOK] No messageText — skipping');
+        }
+    } else if (body.object === 'whatsapp_business_account' && body.entry && body.entry[0].changes && body.entry[0].changes[0].value.statuses) {
+        const statusEvent = body.entry[0].changes[0].value.statuses[0];
+        console.log(`[WEBHOOK STATUS] Recipient: ${statusEvent.recipient_id}, Status: ${statusEvent.status}`);
+        if (statusEvent.errors) {
+            console.error(`[WEBHOOK STATUS ERROR] Meta Delivery Error for ${statusEvent.recipient_id}:`, JSON.stringify(statusEvent.errors, null, 2));
         }
     } else {
         console.log('[WEBHOOK] Not a message event — ignored');
